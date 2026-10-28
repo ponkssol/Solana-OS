@@ -16,7 +16,6 @@ const MENUS: { label: string; windowId?: WindowId; heavy?: boolean }[] = [
 
 export const TopMenuBar: React.FC = () => {
   const {
-    openWindow,
     lockVault,
     toggleShield,
     vault,
@@ -25,6 +24,9 @@ export const TopMenuBar: React.FC = () => {
     displayBrightness,
     setDisplayBrightness,
     setSpotlightOpen,
+    setShellView,
+    setSettingsOpen,
+    openWindow: openApp,
   } = useOSStore();
   const [controlOpen, setControlOpen] = useState(false);
   const [volume, setVolume] = useState(68);
@@ -36,7 +38,17 @@ export const TopMenuBar: React.FC = () => {
           <button
             key={item.label}
             type="button"
-            onClick={() => item.windowId && openWindow(item.windowId)}
+            onClick={() => {
+              if (item.label === 'Solana OS') {
+                setSettingsOpen(true);
+                return;
+              }
+              openApp('app-cloner');
+              if (item.label === 'Vault') setShellView('vault');
+              else if (item.label === 'Shield') setShellView('shield');
+              else if (item.label === 'Builder') setShellView('builder');
+              else if (item.label === 'Sandbox' || item.label === 'File') setShellView('sandboxes');
+            }}
             className={`rounded-[4px] px-[9px] py-[4px] text-[13px] leading-[16px] text-white ${
               item.heavy ? 'pl-[11px] pr-[9px] font-[860]' : 'font-[590]'
             }`}

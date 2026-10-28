@@ -1,22 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useOSStore, WindowId } from '../store/useOSStore';
+import { useOSStore } from '../store/useOSStore';
 
-const ENTRIES: { label: string; hint: string; windowId?: WindowId; room?: 'main' | 'degen' | 'dev' | 'burner' }[] = [
-  { label: 'vault.solos', hint: 'Post-quantum enclave', windowId: 'vault-monitor' },
-  { label: 'App Cloner', hint: 'Isolated .exe namespaces', windowId: 'app-cloner' },
-  { label: 'Anti-Drainer Shield', hint: 'Pre-sign simulation', windowId: 'degen-terminal' },
-  { label: 'Builder Suite', hint: 'Anchor & id.json signer', windowId: 'dev-console' },
-  { label: 'Phantom', hint: 'Standalone wallet', windowId: 'phantom-wallet' },
-  { label: 'Solflare', hint: 'Standalone wallet', windowId: 'solflare-wallet' },
-  { label: 'Backpack', hint: 'Standalone wallet', windowId: 'backpack-wallet' },
-  { label: 'Burner Room', hint: 'Ephemeral session', windowId: 'burner-session', room: 'burner' },
-  { label: 'Main Room', hint: 'Switch room', room: 'main' },
-  { label: 'Degen Room', hint: 'Switch room', room: 'degen' },
-  { label: 'Dev Room', hint: 'Switch room', room: 'dev' },
+const ENTRIES: { label: string; hint: string; view?: 'sandboxes' | 'vault' | 'shield' | 'builder' | 'terminal'; wallet?: 'phantom' | 'solflare' | 'backpack'; room?: 'main' | 'degen' | 'dev' | 'burner' }[] = [
+  { label: 'App Cloner', hint: 'Isolated .exe namespaces', view: 'sandboxes' },
+  { label: 'Quantum Vault', hint: 'ML-KEM-1024 container', view: 'vault' },
+  { label: 'Anti-Drainer Shield', hint: 'Pre-sign simulation', view: 'shield' },
+  { label: 'Builder Suite', hint: 'Anchor and id.json signer', view: 'builder' },
+  { label: 'Solana OS Terminal', hint: 'Windows ConPTY bridge', view: 'terminal' },
+  { label: 'Phantom', hint: 'Standalone wallet', wallet: 'phantom' },
+  { label: 'Solflare', hint: 'Standalone wallet', wallet: 'solflare' },
+  { label: 'Backpack', hint: 'Standalone wallet', wallet: 'backpack' },
+  { label: 'Main Room', hint: 'Switch room', room: 'main', view: 'sandboxes' },
+  { label: 'Degen Room', hint: 'Switch room', room: 'degen', view: 'sandboxes' },
+  { label: 'Dev Room', hint: 'Switch room', room: 'dev', view: 'builder' },
 ];
 
 export const Spotlight: React.FC = () => {
-  const { setSpotlightOpen, openWindow, switchRoom } = useOSStore();
+  const { setSpotlightOpen, openWindow, switchRoom, setShellView, setWalletBrand } = useOSStore();
   const [query, setQuery] = useState('');
 
   const results = useMemo(() => {
@@ -67,8 +67,10 @@ export const Spotlight: React.FC = () => {
               key={item.label}
               type="button"
               onClick={() => {
+                openWindow('app-cloner');
                 if (item.room) void switchRoom(item.room);
-                if (item.windowId) openWindow(item.windowId);
+                if (item.view) setShellView(item.view);
+                if (item.wallet) setWalletBrand(item.wallet);
                 setSpotlightOpen(false);
               }}
               className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left hover:bg-white/15"

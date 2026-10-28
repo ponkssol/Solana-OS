@@ -9,6 +9,8 @@ import {
 } from '../lib/tauriIpc';
 
 export type OSScreenState = 'boot' | 'lock' | 'desktop';
+export type ShellView = 'sandboxes' | 'vault' | 'shield' | 'builder' | 'terminal';
+export type WalletBrandName = 'phantom' | 'solflare' | 'backpack';
 
 export type WindowId =
   | 'vault-monitor'
@@ -67,6 +69,11 @@ interface OSStoreState {
   auditLogs: AuditLogEntry[];
   spotlightOpen: boolean;
   displayBrightness: number;
+  shellView: ShellView;
+  roomFilter: string | null;
+  walletBrand: WalletBrandName | null;
+  settingsOpen: boolean;
+  terminalOpen: boolean;
   processFreezeActive: boolean;
   frozenProcessCount: number;
 
@@ -90,6 +97,11 @@ interface OSStoreState {
   toggleProcessFreeze: () => void;
   setSpotlightOpen: (open: boolean) => void;
   setDisplayBrightness: (value: number) => void;
+  setShellView: (view: ShellView) => void;
+  setRoomFilter: (room: string | null) => void;
+  setWalletBrand: (brand: WalletBrandName | null) => void;
+  setSettingsOpen: (open: boolean) => void;
+  setTerminalOpen: (open: boolean) => void;
 }
 
 const INITIAL_WINDOWS: OSWindow[] = [
@@ -231,6 +243,11 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
   clonedAppsCount: 2,
   spotlightOpen: false,
   displayBrightness: 100,
+  shellView: 'sandboxes',
+  roomFilter: null,
+  walletBrand: null,
+  settingsOpen: false,
+  terminalOpen: false,
   processFreezeActive: true,
   frozenProcessCount: 3,
   auditLogs: [
@@ -489,6 +506,20 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
   setSpotlightOpen: (spotlightOpen) => set({ spotlightOpen }),
 
   setDisplayBrightness: (displayBrightness) => set({ displayBrightness }),
+
+  setShellView: (shellView) => set({ shellView, terminalOpen: shellView === 'terminal' }),
+
+  setRoomFilter: (roomFilter) => set({ roomFilter, shellView: 'sandboxes', terminalOpen: false }),
+
+  setWalletBrand: (walletBrand) => set({ walletBrand }),
+
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+
+  setTerminalOpen: (terminalOpen) =>
+    set((state) => ({
+      terminalOpen,
+      shellView: terminalOpen ? 'terminal' : state.shellView === 'terminal' ? 'builder' : state.shellView,
+    })),
 
   syncVaultStatus: async () => {
     const status = await ipcGetVaultStatus();
