@@ -1,0 +1,84 @@
+name: Security audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v3
+
+  rustsec:
+    name: RustSec cargo-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - name: Audit Tauri host crates
+        run: cargo audit --file src-tauri/Cargo.lock
+      - name: Audit Anchor program crates
+        run: cargo audit --file programs/solana-os-registry/Cargo.lock
+
+  secrets:
+    name: Secret and key leak guard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reject id.json, PEM keys, and Solana keypair files
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)id\.json$'; then
+            echo "id.json must not be committed"
+            exit 1
+          fi
+          if git grep -nE 'BEGIN (OPENSSH |RSA |EC |PGP )?PRIVATE KEY' -- . ':!.github' ':!docs' ':!SECURITY.md'; then
+            echo "PEM private key block found"
+            exit 1
+          fi
+          if git grep -nE '\[\s*[0-9]{1,3}(\s*,\s*[0-9]{1,3}){63}\s*\]' -- '*.json' '*.ts' '*.tsx' '*.rs' '*.js'; then
+            echo "64-byte Solana keypair array found"
+            exit 1
+          fi
+          echo "No id.json, PEM private key, or 64-byte keypair array found"
+
+  npm:
+    name: npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
