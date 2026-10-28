@@ -378,7 +378,7 @@ impl IsolatedClipboardVault {
         // 3. Verify anti-clipper cryptographic integrity hash
         let actual_hash = compute_integrity_hash(plaintext.trim());
         if actual_hash != meta.integrity_hash
-            || expected_integrity_hash.map_or(false, |exp| exp != actual_hash)
+            || expected_integrity_hash.is_some_and(|exp| exp != actual_hash)
         {
             self.zeroize_and_clear();
             return IsolatedClipboardReadResult {
