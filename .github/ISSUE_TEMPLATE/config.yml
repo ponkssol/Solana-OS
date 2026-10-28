@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/ponkssol/Solana-OS/security/advisories/new
+    about: Private report for vault, isolation, shield, or program bugs. Please do not open a public issue.
