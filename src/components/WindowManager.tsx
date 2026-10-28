@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { OSWindow, useOSStore, WindowId } from '../store/useOSStore';
-import { FOLDER_ICON, LiquidGlassPill, SidebarVibrancy, Stoplights } from './macosMaterials';
+import { FOLDER_ICON, SidebarVibrancy, Stoplights } from './macosMaterials';
 
 const ROWS = [
   ['Phantom Standalone #01 (Treasury)', '7xKX…9fSol', 'PID 4102 · Landlock', 'Verified Active', '#14f195'],
@@ -115,12 +115,13 @@ function WindowFrame({
           onMouseDown={onDragStart}
         >
           <Stoplights onClose={onClose} onMinimize={onMinimize} onZoom={onZoom} />
-          <button type="button" onClick={onFreeze} aria-label="Freeze">
-            <LiquidGlassPill className="w-[36px]">
-              <span className="flex size-[28px] w-full items-center justify-center text-[12px] text-[#f5f5f5] [mix-blend-mode:plus-lighter]">
-                {win.isFrozen ? '❄' : '☰'}
-              </span>
-            </LiquidGlassPill>
+          <button
+            type="button"
+            onClick={onFreeze}
+            aria-label="Freeze"
+            className="flex size-[28px] items-center justify-center rounded-[6px] border border-white/10 bg-white/[0.06] text-[13px] text-[#f5f5f5]"
+          >
+            {win.isFrozen ? '❄' : '☰'}
           </button>
         </div>
         <nav className="relative z-[1] w-full px-[14px]">
@@ -174,18 +175,18 @@ function ClonerBody({
     <>
       <div className="relative flex items-center gap-[8px] py-[8px] pl-[18px] pr-[8px]">
         <div className="absolute inset-0 border-b-[0.67px] border-white/10 bg-[rgba(31,31,31,0.55)] backdrop-blur-[3px]" />
-        <LiquidGlassPill className="relative p-[4px]">
+        <div className="relative flex h-[28px] items-center rounded-[6px] border border-white/10 bg-white/[0.06] p-[2px]">
           {['I', 'II', 'III', 'IV'].map((mark, index) => (
             <span
               key={mark}
-              className={`flex h-[28px] w-[32px] items-center justify-center rounded-[100px] text-[10px] font-[510] text-[#f5f5f5] ${
-                index === 0 ? 'bg-[#141414] [mix-blend-mode:plus-lighter]' : ''
+              className={`flex h-[22px] w-[28px] items-center justify-center rounded-[5px] text-[10px] font-[510] text-[#f5f5f5] ${
+                index === 0 ? 'bg-white/[0.14]' : ''
               }`}
             >
               {mark}
             </span>
           ))}
-        </LiquidGlassPill>
+        </div>
         <div className="relative min-w-0 flex-1 text-center">
           <div className="truncate text-[13px] font-[700] leading-[15px] text-white/85 [mix-blend-mode:plus-lighter]">
             Universal App Cloner — cgroups v2 Enclave
@@ -194,16 +195,19 @@ function ClonerBody({
             vault.solos · ML-KEM-1024 · CRYSTALS-Dilithium
           </div>
         </div>
-        <LiquidGlassPill className="relative w-[130px] gap-[6px] px-[10px]">
-          <span className="text-[#8a8a8a]">⌕</span>
+        <label className="relative flex h-[28px] w-[168px] items-center gap-1.5 rounded-[6px] border border-white/12 bg-white/[0.06] px-2 focus-within:border-[#0088ff] focus-within:shadow-[0_0_0_3px_rgba(0,136,255,0.45)]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden>
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.2-3.2" strokeLinecap="round" />
+          </svg>
           <input
             value={query}
             onChange={(event) => onQuery(event.target.value)}
             placeholder="Search"
             aria-label="Search instances"
-            className="w-full bg-transparent text-[13px] text-[#8a8a8a] outline-none placeholder:text-[#8a8a8a]"
+            className="w-full bg-transparent text-[13px] text-white/85 outline-none placeholder:text-[#8a8a8a]"
           />
-        </LiquidGlassPill>
+        </label>
       </div>
 
       <div className="grid grid-cols-[1.4fr_0.8fr_0.9fr_0.8fr] border-b border-white/10 px-3 py-1 text-[11px] font-[700] leading-[14px] text-[#8a8a8a]">
@@ -239,16 +243,16 @@ function ClonerBody({
         ))}
       </div>
       <div className="flex items-center gap-[8px] px-[20px] pb-[20px] pt-[12px]">
-        <button type="button" onClick={() => onOpen('phantom-wallet')} className="h-[24px] rounded-[6px] bg-white/12 px-[16px] text-[13px] font-[510]">
+        <button type="button" onClick={() => onOpen('phantom-wallet')} className="h-[28px] rounded-[6px] bg-white/12 px-3 text-[13px] font-[510]">
           Clone New App Instance
         </button>
-        <button type="button" className="h-[24px] rounded-[6px] bg-[#ff383c]/20 px-[16px] text-[13px] font-[510] text-[#ff383c]">
+        <button type="button" className="h-[28px] rounded-[6px] bg-[#ff383c]/20 px-3 text-[13px] font-[510] text-[#ff383c]">
           Terminate Sandbox
         </button>
-        <button type="button" className="h-[24px] rounded-[6px] bg-white/12 px-[16px] text-[13px] font-[510]">
+        <button type="button" className="h-[28px] rounded-[6px] bg-white/12 px-3 text-[13px] font-[510]">
           Freeze Process
         </button>
-        <button type="button" onClick={() => onOpen('phantom-wallet')} className="h-[24px] rounded-[6px] bg-[#0088ff] px-[16px] text-[13px] font-[510] text-white">
+        <button type="button" onClick={() => onOpen('phantom-wallet')} className="h-[28px] rounded-[6px] bg-[#0088ff] px-3 text-[13px] font-[510] text-white">
           Launch in Enclave
         </button>
       </div>
