@@ -2,6 +2,7 @@ pub mod cloner;
 pub mod desktop;
 pub mod freezer;
 pub mod quantum_vault;
+pub mod security;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -348,6 +349,23 @@ fn resume_room_apps(
 // ============================================================================
 
 #[tauri::command]
+fn inspect_url(url: String) -> security::anti_drainer::PhishingVerdict {
+    security::anti_drainer::check_phishing_url(&url)
+}
+
+#[tauri::command]
+fn simulate_transaction(
+    request: security::anti_drainer::SolanaTxSimulationRequest,
+) -> security::anti_drainer::TransactionSimResult {
+    security::anti_drainer::simulate_and_verify_transaction(&request)
+}
+
+#[tauri::command]
+fn inspect_clipboard(content: String) -> security::anti_drainer::ClickFixVerdict {
+    security::anti_drainer::inspect_clipboard_clickfix(&content)
+}
+
+#[tauri::command]
 fn get_sandbox_telemetry(
     state: State<'_, EnclaveState>,
 ) -> Result<SandboxTelemetrySnapshot, String> {
@@ -474,7 +492,10 @@ pub fn run() {
             switch_virtual_desktop,
             toggle_virtual_desktop,
             emergency_restore_windows_desktop,
-            get_sandbox_telemetry
+            get_sandbox_telemetry,
+            inspect_url,
+            simulate_transaction,
+            inspect_clipboard
         ])
         .run(tauri::generate_context!())
         .expect("error while running Solana OS Tauri application");
