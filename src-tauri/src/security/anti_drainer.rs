@@ -303,8 +303,8 @@ pub fn check_phishing_url(url: &str) -> PhishingVerdict {
             let dist_full = levenshtein_distance(&registrable, protected_dom);
             let dist_sld = levenshtein_distance(host_sld, protected_sld);
 
-            if (dist_full >= 1 && dist_full <= 2)
-                || (protected_sld.len() >= 5 && dist_sld >= 1 && dist_sld <= 2)
+            if (1..=2).contains(&dist_full)
+                || (protected_sld.len() >= 5 && (1..=2).contains(&dist_sld))
             {
                 targeted_brand = Some((*brand_name).to_string());
                 triggers.push(format!(
@@ -418,7 +418,7 @@ pub fn simulate_and_verify_transaction(req: &SolanaTxSimulationRequest) -> Trans
 
     let mut has_advance_nonce = false;
     let mut outbound_transfer_count = 0usize;
-    let mut total_sol_Out_lamports: u64 = 0;
+    let mut total_sol_out_lamports: u64 = 0;
     let mut has_verified_dex = false;
     let mut unknown_programs: Vec<String> = Vec::new();
 
@@ -501,7 +501,7 @@ pub fn simulate_and_verify_transaction(req: &SolanaTxSimulationRequest) -> Trans
                 outbound_transfer_count += 1;
                 let amt = ix.amount.unwrap_or(0);
                 if prog == "11111111111111111111111111111111" || ix.token_mint.is_none() {
-                    total_sol_Out_lamports = total_sol_Out_lamports.saturating_add(amt);
+                    total_sol_out_lamports = total_sol_out_lamports.saturating_add(amt);
                     let sol_val = (amt as f64) / 1_000_000_000.0;
                     balance_delta_summary.push(format!("-{:.4} SOL -> {}", sol_val, dest));
                 } else {
@@ -524,7 +524,7 @@ pub fn simulate_and_verify_transaction(req: &SolanaTxSimulationRequest) -> Trans
 
     // Evaluate Hidden Multi-Asset Sweep / Balance Drainer (>80% SOL balance or >= 3 asset transfers without verified DEX)
     let drains_over_80_pct = req.wallet_sol_balance_lamports > 0
-        && (total_sol_Out_lamports as u128) * 100
+        && (total_sol_out_lamports as u128) * 100
             >= (req.wallet_sol_balance_lamports as u128) * 80;
 
     if !has_verified_dex && outbound_transfer_count >= 2 && (drains_over_80_pct || outbound_transfer_count >= 3 || !unknown_programs.is_empty()) {
@@ -621,7 +621,7 @@ pub fn simulate_and_verify_transaction(req: &SolanaTxSimulationRequest) -> Trans
 /// Minimal Base64 decoder (handles both standard UTF-8 and UTF-16LE PowerShell payloads)
 fn try_decode_base64_token(token: &str) -> Option<String> {
     let clean = token.trim().trim_matches(&['\'', '"'][..]);
-    if clean.len() < 16 || clean.len() % 4 != 0 {
+    if clean.len() < 16 || !clean.len().is_multiple_of(4) {
         return None;
     }
     if !clean
@@ -663,8 +663,10 @@ fn try_decode_base64_token(token: &str) -> Option<String> {
     // Check if UTF-16LE (every odd byte is 0x00, typical for PowerShell -EncodedCommand)
     if out.len() >= 4 && out.len() % 2 == 0 && out.iter().skip(1).step_by(2).filter(|&&b| b == 0).count() > out.len() / 3 {
         let utf16: Vec<u16> = out
-            .chunks_exact(2)
-            .map(|ch| u16::from_le_bytes([ch[0], ch[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|ch| u16::from_le_bytes(*ch))
             .collect();
         if let Ok(s) = String::from_utf16(&utf16) {
             return Some(s);

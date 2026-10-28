@@ -120,6 +120,22 @@ Phase 1 (this tree) is the shell, the cloner, the vault container, the registry,
 
 Phase 2 is tracked in [#5](https://github.com/ponkssol/Solana-OS/issues/5): a local AI agent, an airlock for file transfer, a hardware-wallet and Solana Mobile bridge, a dead-man's-switch inheritance flow, and on-chain binary hash checks at boot. Detail is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
+## Automated security and bug detection
+
+Every push and pull request is scanned. Dependabot also opens weekly update PRs.
+
+| Bot | What it checks |
+| --- | --- |
+| [Dependabot](.github/dependabot.yml) | npm, both Cargo lockfiles (`src-tauri`, `programs/solana-os-registry`), and GitHub Actions. Weekly. Labels: `security`, `dependencies`. |
+| [Security audit](.github/workflows/security-audit.yml) | CodeQL for JavaScript/TypeScript, RustSec `cargo audit` on both lockfiles, gitleaks plus a `id.json` / private-key regex guard, `npm audit --audit-level=high`. |
+| [Bug detector](.github/workflows/bug-detector.yml) | `tsc --noEmit`, Vite production build, `cargo check`, `cargo clippy -- -D warnings` on the host and the Anchor program. |
+
+[![Security audit](https://github.com/ponkssol/Solana-OS/actions/workflows/security-audit.yml/badge.svg)](https://github.com/ponkssol/Solana-OS/actions/workflows/security-audit.yml)
+[![Bug detector](https://github.com/ponkssol/Solana-OS/actions/workflows/bug-detector.yml/badge.svg)](https://github.com/ponkssol/Solana-OS/actions/workflows/bug-detector.yml)
+[![CI](https://github.com/ponkssol/Solana-OS/actions/workflows/ci.yml/badge.svg)](https://github.com/ponkssol/Solana-OS/actions/workflows/ci.yml)
+
+What is ignored, and why, is written in [SECURITY.md](SECURITY.md).
+
 ## License
 
 MIT or Apache-2.0, at your option. See [LICENSE](LICENSE).

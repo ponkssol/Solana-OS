@@ -1,0 +1,12 @@
+title = "Solana OS"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Lockfiles and generated schemas are not secrets"
+paths = [
+  '''(^|/)Cargo\.lock$''',
+  '''(^|/)package-lock\.json$''',
+  '''src-tauri/gen/schemas/.*''',
+]
