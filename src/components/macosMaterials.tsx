@@ -126,22 +126,9 @@ export function SidebarVibrancy({ width = 240 }: { width?: number }) {
 
 export function DockGlass() {
   return (
-    <div className="pointer-events-none absolute inset-0 rounded-[15px]">
-      <div className="absolute inset-0 rounded-[15px] shadow-[0px_0px_0px_0.5px_rgba(0,0,0,0.25)]">
-        <div className="absolute inset-0 rounded-[15px] bg-[rgba(69,69,69,0.5)] [mix-blend-mode:luminosity]" />
-        <div className="absolute inset-0 rounded-[15px] bg-[rgba(26,26,26,0.1)]" />
-        <div className="absolute inset-0 rounded-[15px] bg-[rgba(255,255,255,0.08)] [mix-blend-mode:lighten]" />
-      </div>
-      <div className="absolute inset-0 rounded-[15px]">
-        <div className="absolute inset-0 rounded-[15px] bg-white [mix-blend-mode:multiply]" />
-        <div
-          className="absolute inset-0 rounded-[inherit]"
-          style={{
-            boxShadow:
-              'inset 0px 2.5px 1.5px -2.5px #808080, inset 0px -2.5px 1.5px -2.5px #808080, inset 0px 16px 16px -16px #161616, inset 0px -16px 16px -16px #161616',
-          }}
-        />
-      </div>
-    </div>
+    <div
+      className="pointer-events-none absolute inset-0 rounded-[15px] border border-white/[0.07] bg-[rgba(28,28,30,0.72)]"
+      style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.75), 0 10px 28px rgba(0,0,0,0.4)' }}
+    />
   );
 }

@@ -17,14 +17,14 @@ export function NotificationStack() {
       {NOTES.map((note) => (
         <article
           key={note.title}
-          className="pointer-events-auto relative h-[72px] overflow-hidden rounded-[16px] border border-white/15 px-3.5 py-2.5"
-          style={{ boxShadow: '0px 0px 0px 0.5px rgba(255,255,255,0.18), 0px 12px 32px rgba(0,0,0,0.45)' }}
+          className="pointer-events-auto relative h-[72px] overflow-hidden rounded-[16px] border border-white/[0.07] px-3.5 py-2.5"
+          style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.75), 0px 12px 32px rgba(0,0,0,0.45)' }}
         >
           <div
             className="absolute inset-0 rounded-[16px] bg-[rgba(38,38,38,0.75)] backdrop-blur-[40px] [mix-blend-mode:luminosity]"
           />
           <div className="relative flex items-start justify-between gap-3">
-            <h3 className="text-[13px] font-[700] leading-[16px] text-[#f5f5f5] [mix-blend-mode:plus-lighter]">
+            <h3 className="text-[13px] font-[700] leading-[16px] text-[#f5f5f5]">
               {note.title}
             </h3>
             <span className="shrink-0 text-[11px] font-[400] leading-[14px] text-[#8a8a8a]">{note.when}</span>

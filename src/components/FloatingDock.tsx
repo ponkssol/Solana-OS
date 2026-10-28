@@ -38,9 +38,9 @@ export const FloatingDock: React.FC = () => {
         );
       })}
       <div className="flex items-center px-[5px] pb-[9.5px]">
-        <div className="h-[36px] w-px bg-[#404040] [mix-blend-mode:plus-lighter]" />
+        <div className="h-[36px] w-px bg-white/[0.07]" />
       </div>
-      <img src={`${FIGMA}/dea72.png`} alt="" className="mb-[4px] size-[36px] object-contain" />
+      <img src="/icons/folder.svg" alt="" className="mb-[4px] size-[36px]" />
       <img src={`${FIGMA}/cc48b.png`} alt="" className="mb-[4px] size-[36px] object-contain" />
     </div>
   );
