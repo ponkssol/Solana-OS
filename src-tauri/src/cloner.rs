@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(not(target_os = "windows"))]
 use std::process::{Child, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -820,8 +821,8 @@ fn configure_windows_registry_sandbox(subkey_path: &str) -> Result<(), String> {
 
         // Verify HKCU predefined key override capability for the sandboxed key, then restore
         // the parent thread's HKCU so the host Tauri process remains on its normal hive.
-        let _ = RegOverridePredefKey(HKEY_CURRENT_USER, Some(isolated_hkey));
-        let _ = RegOverridePredefKey(HKEY_CURRENT_USER, None);
+        let _ = RegOverridePredefKey(HKEY_CURRENT_USER, isolated_hkey);
+        let _ = RegOverridePredefKey(HKEY_CURRENT_USER, HKEY::default());
         let _ = RegCloseKey(isolated_hkey);
     }
     Ok(())
