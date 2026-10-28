@@ -28,9 +28,9 @@ export default {
         sans: [
           '-apple-system',
           'BlinkMacSystemFont',
-          '"Inter"',
+          '"SF Pro Text"',
           '"SF Pro Display"',
-          '"Segoe UI"',
+          '"Inter"',
           'sans-serif',
         ],
         mono: [
