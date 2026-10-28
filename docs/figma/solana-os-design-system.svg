@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2200" viewBox="0 0 1600 2200">
+  <rect width="1600" height="2200" fill="#0c0d12"/>
+  <text x="48" y="64" fill="#f5f5f5" font-family="Inter, SF Pro Text, sans-serif" font-size="32" font-weight="700">Solana OS Design System</text>
+  <text x="48" y="96" fill="#8a8a8a" font-family="Inter, sans-serif" font-size="14">Drag this board into Figma. Dark hairlines, 6px controls, 15px sidebar symbols.</text>
+
+  <text x="48" y="150" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="16" font-weight="700">Color</text>
+  <g font-family="Inter, sans-serif" font-size="12" fill="#f5f5f5">
+    <rect x="48" y="168" width="88" height="64" rx="8" fill="#1e1e1e" stroke="rgba(255,255,255,0.07)"/>
+    <text x="48" y="252">Window #1E1E1E</text>
+    <rect x="180" y="168" width="88" height="64" rx="8" fill="#141517" stroke="rgba(255,255,255,0.07)"/>
+    <text x="180" y="252">Sidebar #141517</text>
+    <rect x="312" y="168" width="88" height="64" rx="8" fill="#101114" stroke="rgba(255,255,255,0.07)"/>
+    <text x="312" y="252">Terminal #101114</text>
+    <rect x="444" y="168" width="88" height="64" rx="8" fill="#0A84FF"/>
+    <text x="444" y="252">Accent #0A84FF</text>
+    <rect x="576" y="168" width="88" height="64" rx="8" fill="#0088FF"/>
+    <text x="576" y="252">Primary #0088FF</text>
+    <rect x="708" y="168" width="88" height="64" rx="8" fill="#FF383C"/>
+    <text x="708" y="252">Danger #FF383C</text>
+    <rect x="840" y="168" width="40" height="64" rx="8" fill="#F06E6A"/>
+    <rect x="888" y="168" width="40" height="64" rx="8" fill="#FFCD30"/>
+    <rect x="936" y="168" width="40" height="64" rx="8" fill="#58C73B"/>
+    <text x="840" y="252">Stoplights</text>
+  </g>
+
+  <text x="48" y="310" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="16" font-weight="700">Typography</text>
+  <text x="48" y="348" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="13" font-weight="800">Solana OS  ·  13 / 860</text>
+  <text x="48" y="376" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="13" font-weight="600">File  Sandbox  Vault  Shield  Builder  ·  13 / 590</text>
+  <text x="48" y="404" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="13" font-weight="700">Universal App Cloner  ·  13 / 700</text>
+  <text x="48" y="428" fill="#8a8a8a" font-family="Inter, sans-serif" font-size="11" font-weight="700">ISOLATED ROOMS  ·  11 / 700</text>
+  <text x="48" y="450" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="11" font-weight="500">Main Treasury  ·  11 / 510</text>
+  <text x="48" y="476" fill="#d6d6d6" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12">solana-os@windows-conpty C:\VaultRooms\MainRoom&gt;</text>
+
+  <text x="48" y="530" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="16" font-weight="700">Window chrome</text>
+  <rect x="48" y="548" width="720" height="280" rx="16" fill="#1e1e1e" stroke="rgba(255,255,255,0.07)"/>
+  <rect x="48" y="548" width="220" height="280" rx="16" fill="#141517"/>
+  <rect x="252" y="548" width="16" height="280" fill="#1e1e1e"/>
+  <circle cx="78" cy="576" r="7" fill="#F06E6A"/>
+  <circle cx="98" cy="576" r="7" fill="#FFCD30"/>
+  <circle cx="118" cy="576" r="7" fill="#58C73B"/>
+  <rect x="280" y="564" width="120" height="28" rx="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.06)"/>
+  <rect x="284" y="568" width="28" height="20" rx="5" fill="rgba(255,255,255,0.14)"/>
+  <rect x="560" y="564" width="180" height="28" rx="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.06)"/>
+  <text x="572" y="582" fill="#8a8a8a" font-family="Inter, sans-serif" font-size="12">Search</text>
+  <text x="64" y="620" fill="#0A84FF" font-family="Inter, sans-serif" font-size="14">£</text>
+  <text x="88" y="620" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="12">Active Sandboxes</text>
+  <text x="64" y="644" fill="#0A84FF" font-family="Inter, sans-serif" font-size="14"></text>
+  <text x="88" y="644" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="12">Main Treasury</text>
+  <text x="64" y="668" fill="#0A84FF" font-family="Inter, sans-serif" font-size="14">è</text>
+  <text x="88" y="668" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="12">Anti-Drainer</text>
+  <text x="64" y="692" fill="#0A84FF" font-family="Inter, sans-serif" font-size="14">&gt;_</text>
+  <text x="88" y="692" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="12">Solana OS Terminal</text>
+  <rect x="280" y="760" width="160" height="28" rx="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.06)"/>
+  <text x="292" y="778" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="12">Clone New App</text>
+  <rect x="452" y="760" width="120" height="28" rx="6" fill="#0088FF"/>
+  <text x="468" y="778" fill="#ffffff" font-family="Inter, sans-serif" font-size="12">Launch</text>
+
+  <text x="48" y="880" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="16" font-weight="700">Sidebar symbols · 15px · #0A84FF · no glow</text>
+  <g fill="#0A84FF" transform="translate(48,900)">
+    <path d="M1.4 3.2A1.2 1.2 0 0 1 2.6 2h3.1l1.15 1.3h5.55A1.2 1.2 0 0 1 13.6 4.5v7.3a1.2 1.2 0 0 1-1.2 1.2H2.6a1.2 1.2 0 0 1-1.2-1.2V3.2Z"/>
+  </g>
+  <text x="72" y="912" fill="#8a8a8a" font-family="Inter, sans-serif" font-size="12">folder</text>
+  <g fill="#0A84FF" transform="translate(160,898)">
+    <path d="M7.5 1.4 12.6 3.2v3.9c0 3-2 5.2-5.1 6.5C4.4 12.3 2.4 10.1 2.4 7.1V3.2L7.5 1.4Z"/>
+  </g>
+  <text x="184" y="912" fill="#8a8a8a" font-family="Inter, sans-serif" font-size="12">shield</text>
+  <g fill="#0A84FF" transform="translate(270,898)">
+    <path d="M4.2 6.2V4.7a3.3 3.3 0 0 1 6.6 0v1.5h.7A1.3 1.3 0 0 1 12.8 7.5v4.7a1.3 1.3 0 0 1-1.3 1.3H3.5a1.3 1.3 0 0 1-1.3-1.3V7.5a1.3 1.3 0 0 1 1.3-1.3h.7Z"/>
+  </g>
+  <text x="294" y="912" fill="#8a8a8a" font-family="Inter, sans-serif" font-size="12">lock</text>
+
+  <text x="48" y="980" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="16" font-weight="700">Terminal · Windows ConPTY</text>
+  <rect x="48" y="996" width="860" height="220" rx="16" fill="#101114" stroke="rgba(255,255,255,0.07)"/>
+  <rect x="64" y="1012" width="250" height="28" rx="6" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.06)"/>
+  <text x="74" y="1030" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="12">pwsh.exe  Degen Room (ConPTY)</text>
+  <rect x="324" y="1012" width="190" height="28" rx="6" fill="none" stroke="rgba(255,255,255,0.06)"/>
+  <text x="334" y="1030" fill="#8a8a8a" font-family="Inter, sans-serif" font-size="12">cmd.exe  Win32 Bridge</text>
+  <rect x="524" y="1012" width="180" height="28" rx="6" fill="none" stroke="rgba(255,255,255,0.06)"/>
+  <text x="534" y="1030" fill="#8a8a8a" font-family="Inter, sans-serif" font-size="12">solana-cli  Dev Room</text>
+  <rect x="64" y="1052" width="360" height="22" rx="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.06)"/>
+  <text x="72" y="1067" fill="#8a8a8a" font-family="Inter, sans-serif" font-size="11">Windows ConPTY Connected (PowerShell / CMD Bridge)</text>
+  <rect x="434" y="1052" width="230" height="22" rx="6" fill="rgba(10,132,255,0.12)" stroke="rgba(10,132,255,0.3)"/>
+  <text x="442" y="1067" fill="#0A84FF" font-family="Inter, sans-serif" font-size="11">Zero-Exposure id.json Hook Active</text>
+  <text x="64" y="1104" fill="#d6d6d6" font-family="JetBrains Mono, monospace" font-size="13">solana-os@windows-conpty C:\VaultRooms\MainRoom&gt; solana balance</text>
+  <text x="64" y="1128" fill="#d6d6d6" font-family="JetBrains Mono, monospace" font-size="13">142.85 SOL</text>
+  <text x="64" y="1160" fill="#8a8a8a" font-family="Inter, sans-serif" font-size="12">Quick pills: solana balance · solana config get · anchor build · dir · whoami · help · clear</text>
+
+  <text x="48" y="1260" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="16" font-weight="700">Specimens</text>
+  <rect x="48" y="1280" width="260" height="150" rx="16" fill="rgba(30,30,30,0.92)" stroke="rgba(255,255,255,0.07)"/>
+  <text x="64" y="1310" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="13" font-weight="700">Approve Safe Simulation?</text>
+  <rect x="64" y="1330" width="228" height="28" rx="6" fill="#0088FF"/>
+  <text x="96" y="1348" fill="#fff" font-family="Inter, sans-serif" font-size="12">Sign with Hardware Enclave</text>
+  <rect x="64" y="1364" width="228" height="28" rx="6" fill="rgba(255,255,255,0.08)"/>
+  <text x="120" y="1382" fill="#fff" font-family="Inter, sans-serif" font-size="12">Inspect CPI Trace</text>
+  <rect x="340" y="1280" width="344" height="72" rx="16" fill="rgba(38,38,38,0.9)" stroke="rgba(255,255,255,0.07)"/>
+  <text x="356" y="1310" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="13" font-weight="700">Anti-Drainer Shield · Blocked</text>
+  <text x="356" y="1332" fill="#d0d0d0" font-family="Inter, sans-serif" font-size="11">SetAuthority CPI dropped in Burner Sandbox #02</text>
+  <rect x="720" y="1280" width="320" height="160" rx="16" fill="rgba(22,22,24,0.9)" stroke="rgba(255,255,255,0.07)"/>
+  <text x="736" y="1310" fill="#f5f5f5" font-family="Inter, sans-serif" font-size="13" font-weight="700">Control Center</text>
+  <rect x="736" y="1328" width="54" height="24" rx="12" fill="#0088FF"/>
+  <circle cx="770" cy="1340" r="9" fill="#fff"/>
+  <text x="800" y="1345" fill="#8a8a8a" font-family="Inter, sans-serif" font-size="12">Anti-Drainer</text>
+</svg>
