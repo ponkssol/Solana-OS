@@ -5,13 +5,14 @@ import { LockScreen } from './components/LockScreen';
 import { TopMenuBar } from './components/TopMenuBar';
 import { WindowManager } from './components/WindowManager';
 import { FloatingDock } from './components/FloatingDock';
-import { WallpaperSvg } from './components/WallpaperSvg';
 import { Spotlight } from './components/Spotlight';
+import { NotificationStack } from './components/NotificationStack';
+import { MacOSDialogModal } from './components/MacOSDialogModal';
+import { WALLPAPER } from './components/macosMaterials';
 
 export const App: React.FC = () => {
   const {
     screen,
-    activeRoom,
     syncVaultStatus,
     lockVault,
     spotlightOpen,
@@ -51,9 +52,15 @@ export const App: React.FC = () => {
       className="relative flex h-screen w-screen select-none flex-col overflow-hidden text-white"
       style={{ filter: `brightness(${displayBrightness}%)` }}
     >
-      <WallpaperSvg blurred={false} activeRoom={activeRoom} />
+      <img src={WALLPAPER} alt="" className="pointer-events-none absolute inset-0 size-full object-cover" />
       <TopMenuBar />
       <WindowManager />
+      <NotificationStack />
+      <MacOSDialogModal
+        onSign={() => undefined}
+        onInspect={() => undefined}
+        onReject={() => undefined}
+      />
       <FloatingDock />
       {spotlightOpen && <Spotlight />}
     </div>
