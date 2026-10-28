@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "windows")]
 use std::collections::HashMap;
+#[cfg(target_os = "windows")]
 use std::path::Path;
 
 use crate::cloner::now_epoch_ms;
