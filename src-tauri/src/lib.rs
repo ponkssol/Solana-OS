@@ -2,6 +2,7 @@ pub mod cloner;
 pub mod desktop;
 pub mod freezer;
 pub mod quantum_vault;
+pub mod sandbox;
 pub mod security;
 
 use serde::{Deserialize, Serialize};
@@ -466,6 +467,118 @@ pub fn build_sandbox_telemetry(state: &EnclaveState) -> Result<SandboxTelemetryS
     })
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShellEnclaveStatus {
+    locked: bool,
+    cipher_suite: String,
+    kdf: String,
+    aead: String,
+    kem: String,
+    ram_enclave: String,
+    hardware_shard: String,
+    key_id: String,
+    sandboxes: Vec<crate::cloner::ClonedAppInstance>,
+}
+
+#[tauri::command]
+fn get_enclave_status(state: State<'_, EnclaveState>) -> Result<ShellEnclaveStatus, String> {
+    let vault = state.status.lock().map_err(|_| "Enclave mutex poisoned")?;
+    let cloner = state.cloner.lock().map_err(|_| "App Cloner mutex poisoned")?;
+    Ok(ShellEnclaveStatus {
+        locked: vault.locked,
+        cipher_suite: vault.cipher_suite.clone(),
+        kdf: "Argon2id".into(),
+        aead: "XChaCha20-Poly1305".into(),
+        kem: "ML-KEM-1024".into(),
+        ram_enclave: "VirtualLock + Zeroize".into(),
+        hardware_shard: "YubiKey shard slot".into(),
+        key_id: vault.key_isolation_id.clone(),
+        sandboxes: cloner.list_instances(None),
+    })
+}
+
+#[tauri::command]
+fn clone_app_instance(
+    app_id: String,
+    room_id: String,
+    state: State<'_, EnclaveState>,
+) -> Result<crate::cloner::ClonedAppInstance, String> {
+    let mut cloner = state.cloner.lock().map_err(|_| "App Cloner mutex poisoned")?;
+    cloner.clone_and_launch(crate::cloner::CloneLaunchRequest {
+        app_id,
+        room_id,
+        custom_exe_path: None,
+        extra_args: None,
+        launch_on_enclave_desktop: Some(false),
+        instance_label: None,
+    })
+}
+
+#[tauri::command]
+fn toggle_freeze_process(
+    instance_id: String,
+    state: State<'_, EnclaveState>,
+) -> Result<crate::freezer::FreezeOperationResult, String> {
+    let mut cloner = state.cloner.lock().map_err(|_| "App Cloner mutex poisoned")?;
+    crate::freezer::toggle_freeze_instance(&mut cloner, &instance_id)
+}
+
+#[tauri::command]
+fn terminate_sandbox(
+    instance_id: String,
+    state: State<'_, EnclaveState>,
+) -> Result<crate::cloner::ClonedAppInstance, String> {
+    let mut cloner = state.cloner.lock().map_err(|_| "App Cloner mutex poisoned")?;
+    cloner.terminate_instance(&instance_id)
+}
+
+#[tauri::command]
+fn unlock_vault_container(
+    passphrase: String,
+    state: State<'_, EnclaveState>,
+) -> Result<VaultStatusPayload, String> {
+    unlock_vault_solos(passphrase, state)
+}
+
+#[tauri::command]
+fn simulate_solana_tx() -> security::anti_drainer::TransactionSimResult {
+    let request = security::anti_drainer::SolanaTxSimulationRequest {
+        origin_url: Some("https://jup.ag".into()),
+        signer_wallet: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU".into(),
+        wallet_sol_balance_lamports: 142_850_000_000,
+        instructions: vec![security::anti_drainer::SimulatedInstruction {
+            program_id: "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4".into(),
+            instruction_type: "route".into(),
+            authority_type: None,
+            new_authority: None,
+            delegate: None,
+            destination: None,
+            amount: Some(25_000_000_000),
+            token_mint: None,
+            is_unlimited_approval: Some(false),
+        }],
+        raw_payload_preview: Some("jupiter v6 exact-in".into()),
+    };
+    security::anti_drainer::simulate_and_verify_transaction(&request)
+}
+
+#[tauri::command]
+fn sign_with_ram_enclave(passphrase: String) -> Result<String, String> {
+    quantum_vault::with_signing_key(passphrase.as_bytes(), b"solos-sign-salt!", None, |_| {
+        "signed-in-enclave".to_string()
+    })
+}
+
+#[tauri::command]
+fn run_sandboxed_cli_command(
+    room_id: String,
+    shell_type: String,
+    command: String,
+) -> Result<sandbox::CliRunResult, String> {
+    sandbox::run_sandboxed_cli_command(&room_id, &shell_type, &command)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let initial_state = EnclaveState::new();
@@ -495,7 +608,15 @@ pub fn run() {
             get_sandbox_telemetry,
             inspect_url,
             simulate_transaction,
-            inspect_clipboard
+            inspect_clipboard,
+            get_enclave_status,
+            clone_app_instance,
+            toggle_freeze_process,
+            terminate_sandbox,
+            unlock_vault_container,
+            simulate_solana_tx,
+            sign_with_ram_enclave,
+            run_sandboxed_cli_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running Solana OS Tauri application");

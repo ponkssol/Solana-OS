@@ -1,15 +1,18 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  cloneAppInstance,
+  getEnclaveStatus,
+  signWithRamEnclave,
+  simulateSolanaTx,
+  terminateSandbox,
+  toggleFreezeProcess,
+  type SandboxInstance,
+} from '../lib/tauriBridge';
 import { OSWindow, useOSStore, WindowId } from '../store/useOSStore';
+import { MacOSDialogModal } from './MacOSDialogModal';
 import { SidebarVibrancy, Stoplights } from './macosMaterials';
-
-const ROWS = [
-  ['Phantom Standalone #01 (Treasury)', '7xKX…9fSol', 'PID 4102 · Landlock', 'Verified Active', '#14f195'],
-  ['Phantom Standalone #02 (Burner Mint)', '3mPq…4kBurn', 'PID 4103 · Landlock', 'Isolated Net', '#0a99ff'],
-  ['Cursor Sandbox IDE (Anchor Workspace)', '9vBn…2wStk', 'PID 4180 · SIGSTOP', 'Frozen (0% CPU)', '#38bdf8'],
-  ['Solflare Native #01 (Validator Staking)', '9vBn…2wStk', 'PID 4408 · Landlock', 'Hardware Shard', '#c084fc'],
-  ['Isolated Web3 Browser (Jupiter Perps)', '5xLm…8p Trade', 'PID 4512 · Landlock', 'CPI Shield ON', '#14f195'],
-  ['vault.solos Post-Quantum Keyring Daemon', 'Shamir 2-of-3', 'PID 0812 · Ring-0', 'ML-KEM-1024', '#14f195'],
-] as const;
+import { BuilderPanel, CloneSheet, ShieldPanel, VaultPanel, WalletPanel } from './ShellPanels';
+import { TerminalWindow } from './TerminalWindow';
 
 const SIDEBAR = [
   { section: '', items: ['Active Sandboxes', 'Quantum Enclave'] },
@@ -19,7 +22,7 @@ const SIDEBAR = [
   },
   {
     section: 'Security & Kernel',
-    items: ['Anti-Drainer CPI Guard', 'Quantum Vault ML-KEM', 'Network Namespace'],
+    items: ['Anti-Drainer CPI Guard', 'Quantum Vault ML-KEM', 'Network Namespace', 'Solana OS Terminal'],
   },
 ];
 
@@ -31,13 +34,33 @@ export const WindowManager: React.FC = () => {
     toggleMaximizeWindow,
     focusWindow,
     updateWindowPosition,
-    openWindow,
     toggleWindowFreeze,
+    shellView,
+    roomFilter,
+    walletBrand,
+    setShellView,
+    setRoomFilter,
+    setWalletBrand,
+    lockVault,
   } = useOSStore();
   const [draggingId, setDraggingId] = useState<WindowId | null>(null);
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState(0);
+  const [rows, setRows] = useState<SandboxInstance[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>('ph-1');
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [simulationOpen, setSimulationOpen] = useState(true);
+  const [logs, setLogs] = useState<string[]>([
+    '09:41  blocked SetAuthority on Burner Sandbox #02',
+    '09:40  ClickFix clipboard payload dropped',
+    '09:38  jup.ag origin verified',
+  ]);
+  const [validatorOn, setValidatorOn] = useState(true);
+  const [notice, setNotice] = useState('');
   const dragOffset = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    void getEnclaveStatus().then((status) => setRows(status.sandboxes));
+  }, []);
 
   const onMove = (event: React.MouseEvent) => {
     if (!draggingId) return;
@@ -49,7 +72,26 @@ export const WindowManager: React.FC = () => {
   };
 
   const visible = windows.filter((win) => win.isOpen && !win.isMinimized);
-  const rows = ROWS.filter((row) => row[0].toLowerCase().includes(query.trim().toLowerCase()));
+  const shown = rows.filter((item) => {
+    if (roomFilter && item.room !== roomFilter) return false;
+    if (query.trim() && !item.name.toLowerCase().includes(query.trim().toLowerCase())) return false;
+    return true;
+  });
+
+  const openNav = (item: string) => {
+    if (item === 'Active Sandboxes') {
+      setShellView('sandboxes');
+      setRoomFilter(null);
+    } else if (item === 'Main Treasury') setRoomFilter('treasury');
+    else if (item === 'DeFi & Perps Trading') setRoomFilter('defi');
+    else if (item === 'Burner Minting') setRoomFilter('burner');
+    else if (item === 'Devnet Builder') setShellView('builder');
+    else if (item === 'Quantum Enclave' || item === 'Quantum Vault ML-KEM') setShellView('vault');
+    else if (item === 'Anti-Drainer CPI Guard' || item === 'Network Namespace') setShellView('shield');
+    else if (item === 'Solana OS Terminal') setShellView('terminal');
+  };
+
+  const selected = rows.find((item) => item.id === selectedId) ?? shown[0];
 
   return (
     <div className="absolute inset-0" onMouseMove={onMove} onMouseUp={() => setDraggingId(null)}>
@@ -66,26 +108,81 @@ export const WindowManager: React.FC = () => {
           onMinimize={() => minimizeWindow(win.id)}
           onZoom={() => toggleMaximizeWindow(win.id)}
           onFreeze={() => toggleWindowFreeze(win.id)}
+          onNavigate={openNav}
+          activeItem={activeSidebarItem(shellView, roomFilter)}
         >
           {win.id === 'app-cloner' ? (
-            <ClonerBody
-              rows={rows}
-              query={query}
-              selected={selected}
-              onQuery={setQuery}
-              onSelect={setSelected}
-              onOpen={openWindow}
-            />
+            shellView === 'vault' ? (
+              <VaultPanel
+                locked={false}
+                onLock={() => void lockVault()}
+                onExport={() => setNotice('Exported vault.solos to the room mount.')}
+                onRotate={() => setNotice('Kyber keypair rotation staged inside the enclave.')}
+              />
+            ) : shellView === 'shield' ? (
+              <ShieldPanel logs={logs} onSimulate={() => void runSimulation()} />
+            ) : shellView === 'builder' ? (
+              <BuilderPanel
+                validatorOn={validatorOn}
+                onToggleValidator={() => setValidatorOn((value) => !value)}
+                onOpenTerminal={() => setShellView('terminal')}
+              />
+            ) : shellView === 'terminal' ? (
+              <TerminalWindow roomId={roomFilter ?? 'treasury'} />
+            ) : (
+              <ClonerBody
+                rows={shown}
+                query={query}
+                selectedId={selected?.id ?? null}
+                notice={notice}
+                onQuery={setQuery}
+                onSelect={setSelectedId}
+                onClone={() => setCloneOpen(true)}
+                onFreeze={() => selected && void toggleFreezeProcess(selected.id).then((next) => setRows(next.sandboxes))}
+                onTerminate={() => selected && void terminateSandbox(selected.id).then((next) => setRows(next.sandboxes))}
+                onLaunch={() => selected?.walletBrand && setWalletBrand(selected.walletBrand)}
+              />
+            )
           ) : (
-            <div className="p-6 text-[13px] font-[510] text-white/80">
-              <div className="text-[13px] font-[700] text-white">{win.title}</div>
-              <p className="mt-1 text-[11px] leading-[14px] text-[#8a8a8a]">{win.subtitle}</p>
-            </div>
+            <div className="p-6 text-[13px] text-white/80">{win.title}</div>
           )}
         </WindowFrame>
       ))}
+      {walletBrand && (
+        <section className="absolute right-8 top-[120px] z-30 h-[360px] w-[320px] overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#1e1e1e] shadow-[0_0_0_1px_rgba(0,0,0,0.75),0_18px_40px_rgba(0,0,0,0.5)]">
+          <WalletPanel brand={walletBrand} onClose={() => setWalletBrand(null)} />
+        </section>
+      )}
+      {cloneOpen && (
+        <CloneSheet
+          onCancel={() => setCloneOpen(false)}
+          onClone={(appId, room) => {
+            void cloneAppInstance(appId, room).then((next) => {
+              setRows(next.sandboxes);
+              setCloneOpen(false);
+              setShellView('sandboxes');
+            });
+          }}
+        />
+      )}
+      {simulationOpen && shellView === 'sandboxes' && (
+        <MacOSDialogModal
+          onSign={() => {
+            void signWithRamEnclave().then(() => setSimulationOpen(false));
+          }}
+          onInspect={() => setLogs((prev) => ['09:42  CPI trace: Jupiter v6 route, no SetAuthority', ...prev])}
+          onReject={() => setSimulationOpen(false)}
+        />
+      )}
     </div>
   );
+
+  async function runSimulation() {
+    const result = await simulateSolanaTx();
+    setLogs((prev) => [`now  ${result.summary}`, ...prev]);
+    setSimulationOpen(true);
+    setShellView('sandboxes');
+  }
 };
 
 function WindowFrame({
@@ -96,6 +193,8 @@ function WindowFrame({
   onMinimize,
   onZoom,
   onFreeze,
+  onNavigate,
+  activeItem,
 }: {
   win: OSWindow;
   children: React.ReactNode;
@@ -104,6 +203,8 @@ function WindowFrame({
   onMinimize: () => void;
   onZoom: () => void;
   onFreeze: () => void;
+  onNavigate: (item: string) => void;
+  activeItem: string;
 }) {
   const style: React.CSSProperties = win.isMaximized
     ? { top: 40, left: 16, width: 'calc(100vw - 32px)', height: 'calc(100vh - 120px)', zIndex: win.zIndex }
@@ -138,10 +239,10 @@ function WindowFrame({
                   {group.section}
                 </div>
               )}
-              {group.items.map((item, index) => {
-                const active = group.section === '' && index === 0;
+              {group.items.map((item) => {
+                const active = item === activeItem;
                 return (
-                  <div key={item} className="relative flex h-[24px] w-full items-center gap-[4px] rounded-[5px] pr-[2px]">
+                  <button type="button" key={item} onClick={() => onNavigate(item)} className="relative flex h-[24px] w-full items-center gap-[4px] rounded-[5px] pr-[2px] text-left">
                     {active && (
                       <span className="absolute inset-y-0 -left-1 -right-1 rounded-[8px] bg-[#0d0d0d] [mix-blend-mode:plus-lighter]" />
                     )}
@@ -150,7 +251,7 @@ function WindowFrame({
                       {item}
                       {item === 'Active Sandboxes' && <span className="ml-1 font-normal text-[#8a8a8a]">6</span>}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -165,17 +266,25 @@ function WindowFrame({
 function ClonerBody({
   rows,
   query,
-  selected,
+  selectedId,
+  notice,
   onQuery,
   onSelect,
-  onOpen,
+  onClone,
+  onFreeze,
+  onTerminate,
+  onLaunch,
 }: {
-  rows: readonly (readonly [string, string, string, string, string])[];
+  rows: SandboxInstance[];
   query: string;
-  selected: number;
+  selectedId: string | null;
+  notice: string;
   onQuery: (value: string) => void;
-  onSelect: (index: number) => void;
-  onOpen: (id: WindowId) => void;
+  onSelect: (id: string) => void;
+  onClone: () => void;
+  onFreeze: () => void;
+  onTerminate: () => void;
+  onLaunch: () => void;
 }) {
   return (
     <>
@@ -225,40 +334,41 @@ function ClonerBody({
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
         {rows.map((row, index) => (
           <button
-            key={row[0]}
+            key={row.id}
             type="button"
-            onClick={() => onSelect(index)}
+            onClick={() => onSelect(row.id)}
             className="relative flex h-[28px] w-full items-center text-left text-[12px] font-[510]"
           >
             {index % 2 === 0 && (
               <span className="absolute inset-x-[10px] inset-y-0 rounded-[8px] bg-[rgba(255,255,255,0.04)]" />
             )}
-            {selected === index && <span className="absolute inset-x-[10px] inset-y-0 rounded-[8px] bg-white/[0.06]" />}
+            {selectedId === row.id && <span className="absolute inset-x-[10px] inset-y-0 rounded-[8px] bg-white/[0.06]" />}
             <span className="relative grid w-full grid-cols-[1.4fr_0.8fr_0.9fr_0.8fr] items-center px-2">
               <span className="flex items-center gap-2 truncate text-white">
                 <FolderIcon />
-                {row[0]}
+                {row.name}
               </span>
-              <span className="truncate font-mono text-[11px] text-white/70">{row[1]}</span>
-              <span className="truncate text-white/70">{row[2]}</span>
-              <span className="truncate" style={{ color: row[4] }}>
-                {row[3]}
+              <span className="truncate font-mono text-[11px] text-white/70">{row.wallet}</span>
+              <span className="truncate text-white/70">{row.namespace}</span>
+              <span className="truncate" style={{ color: row.color }}>
+                {row.stateLabel}
               </span>
             </span>
           </button>
         ))}
       </div>
+      {notice && <div className="px-5 text-[12px] text-[#8a8a8a]">{notice}</div>}
       <div className="flex items-center gap-[8px] px-[20px] pb-[20px] pt-[12px]">
-        <button type="button" onClick={() => onOpen('phantom-wallet')} className="h-[28px] rounded-[6px] border border-white/[0.06] bg-white/[0.05] px-3 text-[13px] font-[510]">
-          Clone New App Instance
+        <button type="button" onClick={onClone} className="h-[28px] rounded-[6px] border border-white/[0.06] bg-white/[0.05] px-3 text-[13px] font-[510]">
+          + Clone New App Instance
         </button>
-        <button type="button" className="h-[28px] rounded-[6px] border border-[#ff383c]/20 bg-[#ff383c]/15 px-3 text-[13px] font-[510] text-[#ff383c]">
+        <button type="button" onClick={onTerminate} className="h-[28px] rounded-[6px] border border-[#ff383c]/20 bg-[#ff383c]/15 px-3 text-[13px] font-[510] text-[#ff383c]">
           Terminate Sandbox
         </button>
-        <button type="button" className="h-[28px] rounded-[6px] border border-white/[0.06] bg-white/[0.05] px-3 text-[13px] font-[510]">
+        <button type="button" onClick={onFreeze} className="h-[28px] rounded-[6px] border border-white/[0.06] bg-white/[0.05] px-3 text-[13px] font-[510]">
           Freeze Process
         </button>
-        <button type="button" onClick={() => onOpen('phantom-wallet')} className="h-[28px] rounded-[6px] bg-[#0088ff] px-3 text-[13px] font-[510] text-white">
+        <button type="button" onClick={onLaunch} className="h-[28px] rounded-[6px] bg-[#0088ff] px-3 text-[13px] font-[510] text-white">
           Launch in Enclave
         </button>
       </div>
@@ -272,7 +382,7 @@ function SidebarIcon({ name }: { name: string }) {
       ? 'lock'
       : name === 'Anti-Drainer CPI Guard'
         ? 'shield'
-        : name === 'Devnet Builder'
+        :     name === 'Devnet Builder' || name === 'Solana OS Terminal'
           ? 'terminal'
           : name === 'Network Namespace'
             ? 'globe'
@@ -284,6 +394,17 @@ function SidebarIcon({ name }: { name: string }) {
       <SfIcon kind={kind} />
     </span>
   );
+}
+
+function activeSidebarItem(view: string, room: string | null): string {
+  if (view === 'vault') return 'Quantum Vault ML-KEM';
+  if (view === 'shield') return 'Anti-Drainer CPI Guard';
+  if (view === 'builder') return 'Devnet Builder';
+  if (view === 'terminal') return 'Solana OS Terminal';
+  if (room === 'treasury') return 'Main Treasury';
+  if (room === 'defi') return 'DeFi & Perps Trading';
+  if (room === 'burner') return 'Burner Minting';
+  return 'Active Sandboxes';
 }
 
 function FolderIcon() {

@@ -7,8 +7,8 @@ import { WindowManager } from './components/WindowManager';
 import { FloatingDock } from './components/FloatingDock';
 import { Spotlight } from './components/Spotlight';
 import { NotificationStack } from './components/NotificationStack';
-import { MacOSDialogModal } from './components/MacOSDialogModal';
 import { WALLPAPER } from './components/macosMaterials';
+import { SystemSettingsModal } from './components/SystemSettingsModal';
 
 export const App: React.FC = () => {
   const {
@@ -18,6 +18,8 @@ export const App: React.FC = () => {
     spotlightOpen,
     setSpotlightOpen,
     displayBrightness,
+    settingsOpen,
+    setSettingsOpen,
   } = useOSStore();
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export const App: React.FC = () => {
         e.preventDefault();
         lockVault();
       }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === ' ') {
+      if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === ' ' || e.key.toLowerCase() === 'k')) {
         e.preventDefault();
         setSpotlightOpen(!useOSStore.getState().spotlightOpen);
       }
@@ -56,12 +58,8 @@ export const App: React.FC = () => {
       <TopMenuBar />
       <WindowManager />
       <NotificationStack />
-      <MacOSDialogModal
-        onSign={() => undefined}
-        onInspect={() => undefined}
-        onReject={() => undefined}
-      />
       <FloatingDock />
+      {settingsOpen && <SystemSettingsModal onClose={() => setSettingsOpen(false)} />}
       {spotlightOpen && <Spotlight />}
     </div>
   );
