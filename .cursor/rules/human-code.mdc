@@ -1,0 +1,22 @@
+---
+description: Write code like a person on this repo, not like a generated template
+alwaysApply: true
+---
+
+# Write like the repo
+
+Match the file you are editing. Same names, same density, same comment habit.
+
+Skip the usual generated look:
+- no comments that restate the next line
+- no section banners, emoji, or "here is a helper" narration
+- no extra util, hook, or component for a one-off
+- no JSDoc unless that file already uses it
+- no types, factories, or "for later" layers
+- no unused props, flags, or defensive branches
+
+Do this instead:
+- reuse helpers and names already in the folder
+- keep functions local and short
+- comment only the non-obvious why
+- prefer a slightly uneven real file over a perfect template
