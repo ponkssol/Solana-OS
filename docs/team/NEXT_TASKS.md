@@ -29,3 +29,7 @@ Do not start these until the Phase 1 install is signed and the shell is reading 
 ## Not this list
 
 Dependabot has open update pull requests. They are dependency bumps. Grok Bot triages them; they do not jump ahead of the table above.
+
+## Telegram
+
+GitHub events go to the forum topic from `.github/workflows/telegram-notify.yml`. Secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_TOPIC_ID`. Setup is `docs/TELEGRAM_NOTIFICATIONS.md`. A missing secret skips the send and does not fail the job.
