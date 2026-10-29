@@ -18,6 +18,10 @@ This workflow does not notify for its own runs. The same `workflow_run` (id, att
 
 If `TELEGRAM_BOT_TOKEN` or `TELEGRAM_CHAT_ID` is empty, the job stays green and sends nothing. Pull requests from forks do not receive secrets, so that PR message is skipped. Fork CI results still arrive through `workflow_run` after this file is on the default branch.
 
+Each message is a short card: a bold `Solana OS Update` title with a tag such as `#push`, `#pr`, or `#release`, a boxed header, and `├` / `└` fields. Commit messages and pull request descriptions sit in a `<pre>` block. Times are `Asia/Jakarta` (`YYYY-MM-DD HH:MM:SS +07:00`).
+
+Buttons sit under the message (on the last part if it is split): Compare, Action, and Commit for a push; View PR, Files, and Checks for a pull request; Release plus Download .exe / Download .msi when those assets exist; Run and Logs for a workflow result.
+
 Messages longer than 4096 characters are split. Pull request files, commits, and checks are read with `GITHUB_TOKEN` (`contents: read`, `pull-requests: read`, `checks: read`).
 
 ## Create the bot
