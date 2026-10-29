@@ -1,5 +1,3 @@
-import { LiquidGlassPill } from './macosMaterials';
-
 export function BentoControlCenter({
   shieldOn,
   freezeOn,
@@ -23,7 +21,7 @@ export function BentoControlCenter({
 }) {
   return (
     <div
-      className="w-[320px] rounded-[16px] border border-white/20 p-3 text-white shadow-[0px_18px_54px_rgba(0,0,0,0.57)]"
+      className="w-[min(320px,calc(100vw-24px))] rounded-[16px] border border-white/[0.06] p-3 text-white shadow-[0px_18px_54px_rgba(0,0,0,0.57)]"
       style={{ background: 'rgba(30,30,30,0.85)', backdropFilter: 'blur(40px)' }}
     >
       <div className="mb-3 flex items-center justify-between px-1">
@@ -72,7 +70,7 @@ function ToggleCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center justify-between rounded-[12px] border border-white/10 bg-white/[0.06] px-2.5 py-2 text-left"
+      className="flex items-center justify-between rounded-[12px] border border-white/[0.06] bg-white/[0.05] px-2.5 py-2 text-left"
     >
       <span>
         <span className="block text-[11px] font-[700] leading-[14px] text-[#f5f5f5]">{label}</span>
@@ -80,10 +78,10 @@ function ToggleCard({
       </span>
       <span
         className="relative h-[24px] w-[54px] rounded-[100px]"
-        style={{ background: on ? '#0088ff' : 'rgba(255,255,255,0.16)' }}
+        style={{ background: on ? '#0A84FF' : 'rgba(255,255,255,0.16)' }}
       >
         <span
-          className="absolute top-[2px] size-[20px] rounded-full bg-white shadow-[0px_1px_2px_rgba(0,0,0,0.35)]"
+          className="absolute top-[2px] size-[20px] rounded-full bg-white"
           style={{ left: on ? 32 : 2 }}
         />
       </span>
@@ -101,9 +99,18 @@ function GlassSlider({
   onChange: (value: number) => void;
 }) {
   return (
-    <LiquidGlassPill className="w-full px-3">
-      <div className="flex w-full items-center gap-2">
-        <span className="w-12 text-[11px] font-[510] text-[#8a8a8a] [mix-blend-mode:plus-lighter]">{label}</span>
+    <div className="flex w-full items-center gap-2 rounded-[6px] border border-white/[0.06] bg-white/[0.05] px-3 py-2">
+      <span className="w-12 text-[11px] font-[510] text-[#8a8a8a]">{label}</span>
+      <div className="relative h-[14px] flex-1">
+        <div className="absolute left-0 right-0 top-1/2 h-[4px] -translate-y-1/2 rounded-full border border-white/[0.06] bg-white/[0.08]" />
+        <div
+          className="absolute left-0 top-1/2 h-[4px] -translate-y-1/2 rounded-full bg-[#0A84FF]"
+          style={{ width: `${value}%` }}
+        />
+        <div
+          className="absolute top-1/2 size-[12px] -translate-y-1/2 rounded-full bg-[#f5f5f5]"
+          style={{ left: `calc(${value}% - 6px)` }}
+        />
         <input
           aria-label={label}
           type="range"
@@ -111,9 +118,9 @@ function GlassSlider({
           max={100}
           value={value}
           onChange={(event) => onChange(Number(event.target.value))}
-          className="h-[6px] flex-1 cursor-pointer appearance-none rounded-[100px] bg-white/15 accent-[#0088ff]"
+          className="absolute inset-0 cursor-pointer opacity-0"
         />
       </div>
-    </LiquidGlassPill>
+    </div>
   );
 }

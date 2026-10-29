@@ -94,7 +94,7 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
       {/* Top User & Enclave Header Row */}
       <div className="mb-3.5 flex items-center justify-between px-1">
         <div className="flex items-center gap-2.5">
-          <div className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-gradient-to-br from-[#9945FF]/60 to-[#14F195]/40 shadow-inner">
+          <div className="relative flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.06]">
             <img src={emblemSrc} alt="Solana OS" className="h-4 w-auto" />
             <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-[#0b1020] bg-[#14F195]" />
           </div>
@@ -155,7 +155,7 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
                   <div
                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition ${
                       active
-                        ? 'border-white/40 bg-gradient-to-br from-[#14F195] to-[#0ea5e9] text-slate-950 shadow-[0_0_14px_rgba(20,241,149,0.45)]'
+                        ? 'border-[#0A84FF]/40 bg-[#0A84FF] text-white'
                         : 'border-white/15 bg-white/10 text-white/75'
                     }`}
                   >
@@ -295,7 +295,7 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
       {/* Bottom Live Telemetry Tile (Slot / TPS / Priority Fee) */}
       <div className="solos-bento-tile flex items-center justify-between rounded-[18px] px-3.5 py-2.5">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#9945FF] to-[#14F195] text-slate-950 font-bold text-xs">
+          <div className="flex h-8 w-8 items-center justify-center rounded-[6px] border border-white/[0.06] bg-[#141517] text-[12px] font-medium text-white">
             ◎
           </div>
           <div>

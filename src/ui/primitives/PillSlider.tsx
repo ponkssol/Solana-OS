@@ -10,10 +10,6 @@ export interface PillSliderProps {
   accentGradient?: string;
 }
 
-/**
- * PillSlider implements the macOS Sequoia / Big Sur Control Center horizontal pill slider
- * with embedded left glyph, glowing white/gradient fill bar, and circular/pill right action.
- */
 export const PillSlider: React.FC<PillSliderProps> = ({
   label,
   value,
@@ -21,7 +17,6 @@ export const PillSlider: React.FC<PillSliderProps> = ({
   icon,
   rightBadgeText,
   onRightBadgeClick,
-  accentGradient = 'linear-gradient(90deg, rgba(255,255,255,0.86) 0%, #ffffff 100%)',
 }) => {
   const clamped = Math.max(0, Math.min(100, value));
 
@@ -50,16 +45,12 @@ export const PillSlider: React.FC<PillSliderProps> = ({
           aria-valuemax={100}
           tabIndex={0}
           onClick={handleTrackClick}
-          className="relative h-7 flex-1 cursor-pointer overflow-hidden rounded-full border border-white/15 bg-black/40 shadow-[inset_0_2px_5px_rgba(0,0,0,0.5)]"
+          className="relative h-[14px] flex-1 cursor-pointer"
         >
-          {/* Filled portion */}
+          <div className="absolute left-0 right-0 top-1/2 h-[4px] -translate-y-1/2 rounded-full border border-white/[0.06] bg-white/[0.08]" />
           <div
-            className="h-full rounded-full transition-all duration-150"
-            style={{
-              width: `${clamped}%`,
-              background: accentGradient,
-              boxShadow: '0 0 14px rgba(255, 255, 255, 0.4)',
-            }}
+            className="absolute left-0 top-1/2 h-[4px] -translate-y-1/2 rounded-full bg-[#0A84FF]"
+            style={{ width: `${clamped}%` }}
           />
 
           {/* Left Icon inside pill */}
@@ -75,10 +66,8 @@ export const PillSlider: React.FC<PillSliderProps> = ({
 
           {/* Thumb Knob */}
           <div
-            className="pointer-events-none absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full border border-black/10 bg-white shadow-[0_2px_6px_rgba(0,0,0,0.4)] transition-all duration-150"
-            style={{
-              left: `calc(${clamped}% - ${clamped > 50 ? '22px' : '4px'})`,
-            }}
+            className="pointer-events-none absolute top-1/2 size-3 -translate-y-1/2 rounded-full bg-[#f5f5f5]"
+            style={{ left: `calc(${clamped}% - 6px)` }}
           />
         </div>
 

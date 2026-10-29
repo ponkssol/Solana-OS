@@ -28,6 +28,13 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+      }
+      if (e.key === 'F11') {
+        e.preventDefault();
+        if (!e.repeat) void useOSStore.getState().toggleShellMode();
+      }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l') {
         e.preventDefault();
         lockVault();
@@ -51,7 +58,7 @@ export const App: React.FC = () => {
 
   return (
     <div
-      className="relative flex h-screen w-screen select-none flex-col overflow-hidden text-white"
+      className="relative flex h-full w-full select-none flex-col overflow-hidden text-white"
       style={{ filter: `brightness(${displayBrightness}%)` }}
     >
       <img src={WALLPAPER} alt="" className="pointer-events-none absolute inset-0 size-full object-cover" />

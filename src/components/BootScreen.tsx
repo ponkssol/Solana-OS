@@ -47,7 +47,7 @@ export const BootScreen: React.FC = () => {
 
   return (
     <div
-      className="relative flex h-screen w-screen cursor-pointer select-none flex-col items-center justify-center overflow-hidden bg-black"
+      className="relative flex h-full w-full cursor-pointer select-none flex-col items-center justify-center overflow-hidden bg-black"
       style={{ background: '#000000' }}
       onClick={advanceToLockScreen}
     >
@@ -55,8 +55,10 @@ export const BootScreen: React.FC = () => {
         <img
           src={BRAND_ASSETS.logoWhite}
           alt="SOLANA OS"
-          className="mb-[72px] block h-auto w-[min(460px,72vw)]"
+          width={2172}
+          height={724}
           draggable={false}
+          className="mb-[48px] block h-auto w-[min(460px,68vw)]"
         />
 
         <div

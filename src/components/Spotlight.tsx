@@ -39,13 +39,7 @@ export const Spotlight: React.FC = () => {
       onClick={() => setSpotlightOpen(false)}
     >
       <div
-        className="w-[640px] overflow-hidden rounded-[18px] border border-white/25"
-        style={{
-          background: 'rgba(30, 30, 34, 0.72)',
-          backdropFilter: 'blur(40px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-          boxShadow: '0 30px 80px rgba(0,0,0,0.45)',
-        }}
+        className="w-[min(560px,calc(100%-32px))] overflow-hidden rounded-[16px] border border-white/[0.06] bg-[#1e1e1e] shadow-[0_18px_54px_rgba(0,0,0,0.45)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
@@ -58,7 +52,7 @@ export const Spotlight: React.FC = () => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Spotlight Search"
-            className="w-full bg-transparent text-[18px] outline-none placeholder:text-white/45"
+            className="w-full bg-transparent text-[13px] outline-none placeholder:text-white/45"
           />
         </div>
         <div className="max-h-[320px] overflow-y-auto p-2">
@@ -75,8 +69,8 @@ export const Spotlight: React.FC = () => {
               }}
               className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left hover:bg-white/15"
             >
-              <span className="text-[14px] font-medium">{item.label}</span>
-              <span className="text-[12px] text-white/50">{item.hint}</span>
+              <span className="text-[13px] font-medium">{item.label}</span>
+              <span className="text-[11px] text-white/50">{item.hint}</span>
             </button>
           ))}
           {results.length === 0 && (

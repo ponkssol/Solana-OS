@@ -99,7 +99,7 @@ export const QuantumVaultWindow: React.FC<QuantumVaultWindowProps> = ({
     >
       <div className="space-y-3 p-4">
         {/* Top Post-Quantum Security Banner */}
-        <div className="flex items-center justify-between rounded-2xl border border-[#9945FF]/40 bg-gradient-to-r from-[#9945FF]/20 via-pink-500/15 to-[#14F195]/15 px-3.5 py-2.5">
+        <div className="flex items-center justify-between rounded-[6px] border border-white/[0.06] bg-white/[0.05] px-3.5 py-2.5">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/25 bg-black/40 font-mono text-xs font-bold text-[#14F195]">
               PQ

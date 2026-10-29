@@ -1,5 +1,3 @@
-import React from 'react';
-
 export const FIGMA = '/assets/figma-macos';
 
 export const WALLPAPER = `${FIGMA}/5fffa-1920.png`;
@@ -25,21 +23,9 @@ export const DOCK_ICONS = [
 ] as const;
 
 const STOPLIGHTS = {
-  close: {
-    fill: '#f06e6a',
-    shadow:
-      'inset 0px 1.25px 0.5px -0.75px #999, inset 0px -1.25px 0.5px -0.75px #808080, inset 0px 5px 4px -3px #262626, inset 0px 0px 3px 0px rgba(153,31,0,0.6), inset 0px 17px 4px -10px rgba(153,31,0,0.4)',
-  },
-  minimize: {
-    fill: '#ffcd30',
-    shadow:
-      'inset 0px 1.25px 0.5px -0.75px #999, inset 0px -1.25px 0.5px -0.75px #808080, inset 0px 5px 4px -3px #161616, inset 0px 0px 3px 0px #4d2e0f, inset 0px 17px 4px -10px #4d2e0f',
-  },
-  zoom: {
-    fill: '#58c73b',
-    shadow:
-      'inset 0px 1.25px 0.5px -0.75px #999, inset 0px -1.25px 0.5px -0.75px #808080, inset 0px 5px 4px -3px #262626, inset 0px 0px 3px 0px rgba(17,51,0,0.8), inset 0px 17px 4px -10px rgba(17,51,0,0.6)',
-  },
+  close: '#f06e6a',
+  minimize: '#ffcd30',
+  zoom: '#58c73b',
 } as const;
 
 export function Stoplights({
@@ -64,63 +50,17 @@ export function Stoplights({
           type="button"
           aria-label={button.label}
           onClick={button.onClick}
-          className="relative size-[14px] rounded-[100px]"
-        >
-          <span
-            className="absolute inset-0 rounded-[100px]"
-            style={{ background: STOPLIGHTS[button.key].fill }}
-          />
-          <span
-            className="pointer-events-none absolute inset-0 rounded-[inherit]"
-            style={{ boxShadow: STOPLIGHTS[button.key].shadow }}
-          />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-export function LiquidGlassPill({
-  className = '',
-  children,
-}: {
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={`relative h-[36px] rounded-[1000px] ${className}`}>
-      <div
-        className="absolute inset-0 rounded-[1000px] [mix-blend-mode:luminosity]"
-        style={{
-          background: 'rgba(153,153,153,0.17)',
-          boxShadow:
-            '1.25px 0px 0px -0.75px #a6a6a6, -1.25px 0px 0px -0.75px #a6a6a6, 0px 0px 0px 0.5px #a6a6a6, 0px 8px 15px 0px rgba(0,0,0,0.04)',
-        }}
-      />
-      <div className="pointer-events-none absolute inset-0 rounded-[1000px]">
-        <div className="absolute inset-0 rounded-[1000px] bg-white [mix-blend-mode:multiply]" />
-        <div
-          className="absolute inset-0 rounded-[inherit]"
-          style={{
-            boxShadow:
-              'inset 0px 40px 10px -40px #1a1a1a, inset 0px -40px 10px -40px #1a1a1a, inset 0px 40px 30px -40px #e6e6e6',
-          }}
+          className="relative size-[12px] rounded-[100px]"
+          style={{ background: STOPLIGHTS[button.key] }}
         />
-      </div>
-      <div className="relative z-[1] flex h-full items-center">{children}</div>
+      ))}
     </div>
   );
 }
 
 export function SidebarVibrancy({ width = 240 }: { width?: number }) {
   return (
-    <div
-      className="pointer-events-none absolute inset-y-0 left-0 overflow-hidden backdrop-blur-[40px]"
-      style={{ width }}
-    >
-      <div className="absolute inset-0 bg-[#141517] opacity-[0.92] backdrop-blur-[60px] [mix-blend-mode:luminosity]" />
-      <div className="absolute inset-0 bg-[#808080] opacity-[0.85] [mix-blend-mode:saturation]" />
-    </div>
+    <div className="pointer-events-none absolute inset-y-0 left-0 bg-[#141517]" style={{ width }} />
   );
 }
 
