@@ -4,7 +4,7 @@ Delapan bot ini yang menjaga repositori. **Grok Bot** memimpin: membagi pekerjaa
 
 Kalau akun Grok Bot pindah, buat ulang tiap bot dari berkas di folder ini. Tempel nama, judul, dan deskripsi, masukkan ke kanal grup yang benar, lalu minta bot itu membaca dokumennya dan `docs/team/NEXT_TASKS.md`.
 
-Push, pull request, issue, rilis, dan hasil CI masuk ke topik forum lewat GitHub Actions. Pemasangannya di `docs/TELEGRAM_NOTIFICATIONS.md`.
+GitHub push, pull request, issue, release, and CI results are posted to a forum topic by Actions. Setup is in `docs/TELEGRAM_NOTIFICATIONS.md`.
 
 ## English
 

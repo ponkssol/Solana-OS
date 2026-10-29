@@ -1,61 +1,60 @@
-# Notifikasi GitHub ke Telegram
+# GitHub notifications in Telegram
 
-`.github/workflows/telegram-notify.yml` mengirim peristiwa repositori ke satu topik forum Telegram. Tidak ada server lain. Job memanggil Bot API `sendMessage` (`parse_mode=HTML`, pratinjau tautan mati).
+`.github/workflows/telegram-notify.yml` posts repository events to one Telegram forum topic. There is no extra server. The job calls the Bot API `sendMessage` method with `parse_mode=HTML` and link previews disabled.
 
-Token tidak dicetak di log. Jangan commit token.
+The token is never printed. Do not commit it.
 
-## Peristiwa
+## Events
 
-- Push ke semua cabang. Maksimal 5 commit (sha pendek, baris pertama, tautan), lalu `dan N lagi`.
-- Pull request: dibuka, dibuka lagi, ditutup, digabung, siap ditinjau. Commit baru di PR dikirim ringkas.
-- Review pull request.
-- Issue dibuka, ditutup, dibuka lagi, plus komentar baru.
-- Rilis yang dipublikasikan, termasuk tautan aset.
-- Workflow selesai, berhasil atau gagal: CI, Windows installer, Security audit, Bug detector. Tautan ke run ikut terkirim.
-- Cabang atau tag dibuat / dihapus.
-- Uji manual dari tab Actions.
+- Push on every branch. Up to 5 commits (short sha, first line, link), then `and N more`.
+- Pull requests, in detail: opened, updated, merged, closed, reopened, ready for review, and review submitted. Each message has the number, title, link, author, source and target branch, draft state, labels, assignees, requested reviewers, a description excerpt (about 600 characters, markdown removed), commit and diff stats, up to 15 changed files with `+`/`-`, up to 5 recent commits, and a check summary when the API returns one. Merges include who merged and the merge commit sha. Reviews include the reviewer, the state (approved, changes requested, or commented), and a body excerpt.
+- Issues opened, closed, or reopened, plus new comments.
+- Published releases, including asset links.
+- Finished workflows, success or failure: CI, Windows installer, Security audit, Bug detector, with a link to the run.
+- Branch or tag created or deleted.
+- A manual test from the Actions tab.
 
-Workflow ini tidak memberi tahu run-nya sendiri. `workflow_run` yang sama (id, percobaan, hasil) hanya sekali. Push yang menghapus cabang dilewati karena peristiwa delete sudah mengirim.
+This workflow does not notify for its own runs. The same `workflow_run` (id, attempt, and conclusion) is reported once. A push that deletes a branch is skipped because the delete event already sends a message.
 
-Kalau `TELEGRAM_BOT_TOKEN` atau `TELEGRAM_CHAT_ID` kosong, job tetap hijau dan tidak mengirim. PR dari fork tidak membawa secret, jadi pesan PR-nya dilewati. Hasil CI fork tetap masuk lewat `workflow_run` setelah berkas ini ada di branch default.
+If `TELEGRAM_BOT_TOKEN` or `TELEGRAM_CHAT_ID` is empty, the job stays green and sends nothing. Pull requests from forks do not receive secrets, so that PR message is skipped. Fork CI results still arrive through `workflow_run` after this file is on the default branch.
 
-Pesan yang lebih panjang dari 4096 karakter dipecah.
+Messages longer than 4096 characters are split. Pull request files, commits, and checks are read with `GITHUB_TOKEN` (`contents: read`, `pull-requests: read`, `checks: read`).
 
-## Pasang bot
+## Create the bot
 
-1. Buka @BotFather, kirim `/newbot`, simpan tokennya.
-2. Buat grup dan nyalakan Topics.
-3. Undang bot ke grup, lalu jadikan admin supaya bisa menulis di topik.
+1. Open @BotFather, send `/newbot`, and keep the token.
+2. Create a group and turn on Topics.
+3. Add the bot to the group and make it an admin so it can post in a topic.
 
-## Chat id dan topic id
+## Chat id and topic id
 
-Id grup forum berbentuk `-100...`.
+A forum group's chat id looks like `-100...`.
 
-Dari tautan topik `https://t.me/c/<id>/<topic>`:
+From a topic link `https://t.me/c/<id>/<topic>`:
 
-- `TELEGRAM_CHAT_ID` = `-100` + `<id>`
-- `TELEGRAM_TOPIC_ID` = angka terakhir, yaitu `message_thread_id`
+- `TELEGRAM_CHAT_ID` is `-100` plus `<id>`
+- `TELEGRAM_TOPIC_ID` is the last number, `message_thread_id`
 
-Contoh `https://t.me/c/1234567890/42`: chat `-1001234567890`, topik `42`.
+Example: `https://t.me/c/1234567890/42` means chat `-1001234567890` and topic `42`.
 
-Cara lain: kirim satu pesan di topik (sebut botnya kalau privacy mode masih aktif), lalu buka `https://api.telegram.org/bot<TOKEN>/getUpdates`. Ambil `chat.id` dan `message_thread_id`.
+Or send a message in the topic (mention the bot if privacy mode is on), then open `https://api.telegram.org/bot<TOKEN>/getUpdates`. Read `chat.id` and `message_thread_id`.
 
-Kalau `TELEGRAM_TOPIC_ID` kosong, pesan masuk ke chat umum, bukan ke topik.
+If `TELEGRAM_TOPIC_ID` is empty, messages go to the general chat.
 
-## Secret
+## Secrets
 
 Settings → Secrets and variables → Actions → Secrets:
 
-| Nama | Isi |
+| Name | Value |
 | --- | --- |
-| `TELEGRAM_BOT_TOKEN` | token dari BotFather |
+| `TELEGRAM_BOT_TOKEN` | token from BotFather |
 | `TELEGRAM_CHAT_ID` | `-100...` |
 | `TELEGRAM_TOPIC_ID` | `message_thread_id` |
 
-`TELEGRAM_TOPIC_ID` boleh secret atau variable. Kalau secret terisi, secret yang dipakai.
+`TELEGRAM_TOPIC_ID` may be a secret or a variable. A non-empty secret wins.
 
-## Uji
+## Test
 
-Actions → Telegram notify → Run workflow. Pilih cabang yang memuat workflow ini. Catatan uji opsional.
+Actions → Telegram notify → Run workflow. Pick the branch that contains this workflow. The note is optional.
 
-`workflow_run` baru aktif setelah workflow ini ada di branch default.
+`workflow_run` starts only after this workflow is on the default branch.

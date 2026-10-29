@@ -28,13 +28,15 @@ on:
   workflow_dispatch:
     inputs:
       note:
-        description: Catatan uji (opsional)
+        description: Optional test note
         required: false
         type: string
 
 permissions:
   actions: read
+  checks: read
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.event_name == 'workflow_run' && format('tg-{0}-{1}-{2}', github.event.workflow_run.id, github.event.workflow_run.run_attempt, github.event.workflow_run.conclusion) || format('tg-{0}', github.run_id) }}
