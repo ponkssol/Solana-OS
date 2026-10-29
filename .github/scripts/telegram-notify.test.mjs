@@ -7,6 +7,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
   buildMessage,
+  buildNotification,
+  jakartaTime,
   isDuplicateRun,
   resolveThreadId,
   skipReason,
@@ -51,16 +53,37 @@ test('push lists five newest commits and escapes HTML', () => {
     compare: 'https://github.com/ponkssol/Solana-OS/compare/a...b',
     commits,
   });
-  assert.match(text, /🚀 <b>Push<\/b>/);
-  assert.match(text, /ponkssol\/Solana-OS/);
-  assert.match(text, /nanda/);
+  assert.match(text, /<b>Solana OS Update<\/b> #push/);
+  assert.match(text, /╭─ Repository Updated \(Push\) ─╮/);
+  assert.match(text, /├ Repo <a href="https:\/\/github.com\/ponkssol\/Solana-OS">ponkssol\/Solana-OS<\/a>/);
   assert.match(text, /<code>main<\/code>/);
+  assert.match(text, /Pushed by/);
+  assert.match(text, /nanda/);
+  assert.match(text, /▸ Message/);
+  assert.match(text, /<pre>[\s\S]*&lt;b&gt;baru&lt;\/b&gt; &amp; co/);
   assert.doesNotMatch(text, /<b>baru<\/b>/);
-  assert.match(text, /&lt;b&gt;baru&lt;\/b&gt; &amp; co/);
+  assert.match(text, /▸ Commits \(7\)/);
   assert.match(text, /and 2 more/);
+  assert.match(text, /╰─/);
   assert.ok(text.indexOf('abcdef6') < text.indexOf('abcdef2'));
   assert.doesNotMatch(text, /abcdef0/);
-  assert.match(text, /compare/);
+  const note = buildNotification('push', {
+    ...repo,
+    ref: 'refs/heads/main',
+    compare: 'https://github.com/ponkssol/Solana-OS/compare/a...b',
+    head_commit: {
+      id: 'abcdef6' + '0'.repeat(32),
+      message: 'head',
+      url: 'https://github.com/ponkssol/Solana-OS/commit/abcdef6',
+      timestamp: '2026-10-03T09:51:51Z',
+      author: { name: 'Nanda', email: 'nanda@example.com' },
+    },
+    commits,
+  }, { runId: '31', runNumber: '31' });
+  assert.match(note.text, /2026-10-03 16:51:51 \+07:00/);
+  assert.match(note.text, /Author Nanda &lt;nanda@example.com&gt;/);
+  assert.deepEqual(note.buttons.map((button) => button.text), ['Compare', 'Action #31', 'Commit']);
+  assert.equal(note.buttons[1].url, 'https://github.com/ponkssol/Solana-OS/actions/runs/31');
 });
 
 test('pull request messages include stats, files, commits, and review state', () => {
@@ -97,27 +120,43 @@ test('pull request messages include stats, files, commits, and review state', ()
     commits: [{ id: 'abc1234fff', message: 'newest line', url: 'https://github.com/ponkssol/Solana-OS/commit/abc1234fff' }],
     checks: { passed: 2, failed: 1, pending: 0, failedNames: ['CI'] },
   });
-  assert.match(pr, /PR merged/);
+  assert.match(pr, /<b>Solana OS Update<\/b> #pr/);
+  assert.match(pr, /╭─ Pull Request Merged ─╮/);
   assert.match(pr, /#12/);
   assert.match(pr, /Fix &lt;vault&gt;/);
-  assert.match(pr, /Author: <a href="https:\/\/github.com\/author">author<\/a>/);
+  assert.match(pr, /Author <a href="https:\/\/github.com\/author">author<\/a>/);
   assert.match(pr, /cursor\/fix/);
-  assert.match(pr, /→ <code>main<\/code>/);
-  assert.match(pr, /Draft: no/);
-  assert.match(pr, /Labels: bug, ui/);
-  assert.match(pr, /Assignees: nanda/);
-  assert.match(pr, /Reviewers: qa/);
-  assert.match(pr, /Description: Hello code and docs nope/);
+  assert.match(pr, /→ <a href="https:\/\/github.com\/ponkssol\/Solana-OS\/tree\/main">main<\/a>/);
+  assert.match(pr, /Draft no/);
+  assert.match(pr, /Labels bug, ui/);
+  assert.match(pr, /Assignees nanda/);
+  assert.match(pr, /Reviewers qa/);
+  assert.match(pr, /<pre>Hello code and docs nope<\/pre>/);
   assert.doesNotMatch(pr, /<b>nope<\/b>/);
-  assert.match(pr, /Changes: 6 commits · 16 files · \+40 −3/);
+  assert.match(pr, /Changes 6 commits · 16 files · \+40 −3/);
+  assert.match(pr, /▸ Files \(16\)/);
   assert.match(pr, /src\/f0\.ts \+1 −1/);
   assert.match(pr, /and 1 more/);
   assert.doesNotMatch(pr, /src\/f15\.ts/);
   assert.match(pr, /abc1234<\/a> newest line/);
-  assert.match(pr, /Merged by: <a href="https:\/\/github.com\/merger">merger<\/a>/);
-  assert.match(pr, /Merge commit: <code>deadbee<\/code>/);
-  assert.match(pr, /Checks: 2 passed, 1 failed, 0 pending/);
+  assert.match(pr, /Merged by <a href="https:\/\/github.com\/merger">merger<\/a>/);
+  assert.match(pr, /Merge commit <a href="https:\/\/github.com\/ponkssol\/Solana-OS\/commit\/deadbeefcafebabe">deadbee<\/a>/);
+  assert.match(pr, /▸ Checks/);
+  assert.match(pr, /2 passed, 1 failed, 0 pending/);
   assert.match(pr, /CI failed/);
+  assert.deepEqual(buildNotification('pull_request', {
+    ...repo,
+    action: 'closed',
+    pull_request: {
+      number: 12,
+      title: 'Fix',
+      html_url: 'https://github.com/ponkssol/Solana-OS/pull/12',
+      merged: true,
+      user: { login: 'author' },
+      head: { ref: 'feat' },
+      base: { ref: 'main' },
+    },
+  }).buttons.map((button) => button.text), ['View PR', 'Files', 'Checks']);
 
   const sync = buildMessage('pull_request', {
     ...repo,
@@ -134,7 +173,7 @@ test('pull request messages include stats, files, commits, and review state', ()
   }, {
     commits: [{ id: 'aaa1111', message: 'newest', url: 'https://github.com/ponkssol/Solana-OS/commit/aaa1111' }],
   });
-  assert.match(sync, /PR updated/);
+  assert.match(sync, /Pull Request Updated/);
   assert.match(sync, /aaa1111/);
   assert.match(sync, /and 7 more/);
 
@@ -156,10 +195,11 @@ test('pull request messages include stats, files, commits, and review state', ()
       base: { ref: 'main' },
     },
   });
-  assert.match(review, /PR review submitted/);
-  assert.match(review, /Reviewer: <a href="https:\/\/github.com\/reviewer">reviewer<\/a>/);
-  assert.match(review, /Review: changes requested/);
-  assert.match(review, /Please fix ok/);
+  assert.match(review, /#review/);
+  assert.match(review, /Review Submitted/);
+  assert.match(review, /Reviewer <a href="https:\/\/github.com\/reviewer">reviewer<\/a>/);
+  assert.match(review, /Review changes requested/);
+  assert.match(review, /<pre>Please fix ok<\/pre>/);
 });
 
 test('other events stay short and in English', () => {
@@ -168,7 +208,7 @@ test('other events stay short and in English', () => {
     action: 'opened',
     issue: { number: 9, title: 'Boot loop', html_url: 'https://github.com/ponkssol/Solana-OS/issues/9' },
   });
-  assert.match(issue, /Issue opened/);
+  assert.match(issue, /Issue Opened/);
   assert.match(issue, /#9/);
 
   const comment = buildMessage('issue_comment', {
@@ -177,7 +217,7 @@ test('other events stay short and in English', () => {
     issue: { number: 9, title: 'Boot loop', html_url: 'https://github.com/ponkssol/Solana-OS/issues/9' },
     comment: { body: 'see <script>', html_url: 'https://github.com/ponkssol/Solana-OS/issues/9#issuecomment-1' },
   });
-  assert.match(comment, /Issue comment/);
+  assert.match(comment, /Issue Comment/);
   assert.match(comment, /see &lt;script&gt;/);
 
   const release = buildMessage('release', {
@@ -190,9 +230,22 @@ test('other events stay short and in English', () => {
       assets: [{ name: 'Solana-OS-setup.exe', browser_download_url: 'https://example.com/setup.exe' }],
     },
   });
-  assert.match(release, /Prerelease/);
+  assert.match(release, /#release/);
+  assert.match(release, /Prerelease Published/);
   assert.match(release, /v1\.0\.0-alpha\.2/);
   assert.match(release, /Solana-OS-setup\.exe/);
+  assert.deepEqual(buildNotification('release', {
+    ...repo,
+    release: {
+      name: 'Solana OS v1',
+      tag_name: 'v1.0.0-alpha.2',
+      html_url: 'https://github.com/ponkssol/Solana-OS/releases/tag/v1.0.0-alpha.2',
+      assets: [
+        { name: 'Solana-OS-setup.exe', browser_download_url: 'https://example.com/setup.exe' },
+        { name: 'Solana-OS-setup.msi', browser_download_url: 'https://example.com/setup.msi' },
+      ],
+    },
+  }).buttons.map((button) => button.text), ['Release', 'Download .exe', 'Download .msi']);
 
   const run = buildMessage('workflow_run', {
     ...repo,
@@ -204,14 +257,46 @@ test('other events stay short and in English', () => {
       actor: { login: 'nanda', html_url: 'https://github.com/nanda' },
     },
   });
-  assert.match(run, /Security audit failed/);
-  assert.match(run, /view run/);
+  assert.match(run, /#workflow/);
+  assert.match(run, /Workflow Failed/);
+  assert.match(run, /Security audit/);
+  assert.match(run, /Result failed/);
   assert.match(run, /actions\/runs\/9/);
+  assert.deepEqual(buildNotification('workflow_run', {
+    ...repo,
+    workflow_run: {
+      id: 9,
+      name: 'CI',
+      conclusion: 'success',
+      head_branch: 'main',
+      html_url: 'https://github.com/ponkssol/Solana-OS/actions/runs/9',
+    },
+  }).buttons.map((button) => [button.text, button.url]), [
+    ['Run', 'https://github.com/ponkssol/Solana-OS/actions/runs/9'],
+    ['Logs', 'https://github.com/ponkssol/Solana-OS/actions/runs/9/logs'],
+  ]);
 
-  assert.match(buildMessage('create', { ...repo, ref: 'feat', ref_type: 'branch' }), /Branch created/);
-  assert.match(buildMessage('delete', { ...repo, ref: 'v1', ref_type: 'tag' }), /Tag deleted/);
-  assert.match(buildMessage('workflow_dispatch', repo, { note: 'hello <b>' }), /Notification test/);
+  assert.match(buildMessage('create', { ...repo, ref: 'feat', ref_type: 'branch' }), /Branch Created/);
+  assert.match(buildMessage('delete', { ...repo, ref: 'v1', ref_type: 'tag' }), /Tag Deleted/);
+  assert.match(buildMessage('workflow_dispatch', repo, { note: 'hello <b>' }), /Notification Test/);
   assert.match(buildMessage('workflow_dispatch', repo, { note: 'hello <b>' }), /hello &lt;b&gt;/);
+});
+
+test('Jakarta time is YYYY-MM-DD HH:MM:SS +07:00', () => {
+  assert.equal(jakartaTime('2026-10-03T09:51:51Z'), '2026-10-03 16:51:51 +07:00');
+});
+
+test('split keeps pre blocks closed and buttons belong on the last chunk', () => {
+  const text = `<b>Solana OS Update</b> #push\n<pre>${'a'.repeat(5000)}</pre>\n╰──╯`;
+  const parts = splitMessage(text);
+  assert.ok(parts.length > 1);
+  for (const part of parts) {
+    assert.ok(part.length <= 4096);
+    const opens = (part.match(/<pre>/g) || []).length;
+    const closes = (part.match(/<\/pre>/g) || []).length;
+    assert.equal(opens, closes);
+    assert.ok(part.lastIndexOf('<') <= part.lastIndexOf('>'));
+  }
 });
 
 test('long messages split under 4096 without cutting a tag', () => {
@@ -303,7 +388,7 @@ test('topic id is included and a bad topic falls back without printing the token
   assert.equal(body[0].message_thread_id, 42);
   assert.equal(body[0].parse_mode, 'HTML');
   assert.equal(body[0].disable_web_page_preview, true);
-  assert.match(body[0].text, /Notification test/);
+  assert.match(body[0].text, /Notification Test/);
   assert.match(body[0].text, /ping &lt;b&gt;/);
 
   const badTopic = run({ ...repo, ref: 'refs/heads/main', commits: [] }, {
