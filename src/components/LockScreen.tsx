@@ -30,7 +30,15 @@ export const LockScreen: React.FC = () => {
         <img src={WIFI_ICON} alt="" className="h-[16px] w-[28px]" />
       </div>
 
-      <div className="absolute left-0 right-0 top-[18vh] text-center">
+      <div className="absolute left-0 right-0 top-[14vh] text-center">
+        <img
+          src={BRAND_ASSETS.logoWhite}
+          alt="SOLANA OS"
+          width={2172}
+          height={724}
+          draggable={false}
+          className="mx-auto mb-3 block h-auto w-[min(240px,46vw)]"
+        />
         <div className="text-[15px] font-[510] text-white/90">Thursday, October 29</div>
         <div className="os-clock text-[length:var(--os-type-clock)] leading-none tracking-[-0.04em]">01:14</div>
       </div>

@@ -1,3 +1,5 @@
+import { BRAND_ASSETS } from '../tokens/designTokens';
+
 export function SystemSettingsModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={onClose}>
@@ -14,9 +16,19 @@ export function SystemSettingsModal({ onClose }: { onClose: () => void }) {
           ))}
         </aside>
         <div className="flex flex-1 flex-col p-5 text-[13px]">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-[15px] font-[700]">Solana OS Settings</h2>
-            <button type="button" onClick={onClose} className="h-[28px] rounded-[6px] border border-white/[0.06] px-3">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <img
+                src={BRAND_ASSETS.logoWhite}
+                alt="SOLANA OS"
+                width={2172}
+                height={724}
+                draggable={false}
+                className="mb-2 block h-auto w-[180px]"
+              />
+              <h2 className="text-[13px] font-[600]">Solana OS Settings</h2>
+            </div>
+            <button type="button" onClick={onClose} className="os-btn shrink-0">
               Done
             </button>
           </div>

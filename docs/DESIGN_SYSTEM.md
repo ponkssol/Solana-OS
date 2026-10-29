@@ -2,6 +2,10 @@
 
 This is the dark desktop system used by the shell. The companion file [`docs/figma/solana-os-design-system.svg`](figma/solana-os-design-system.svg) is a vector board. In Figma, use **File → Place image** or drag the SVG onto the canvas. It is vectors (rectangles, text, paths), so the swatches and icons stay editable.
 
+## Wordmark
+
+`public/assets/logo-white.png` is the official 2172×724 RGBA wordmark (white mark and “SOLANA OS” on a transparent background). The boot screen, lock screen, and Settings header display that file. Width is set in CSS and height is `auto`, so the browser downscales it. Do not trace it, recompress it, or set `image-rendering: pixelated`. The square installer icons in `src-tauri/icons` are Lanczos reductions of the mark from that same file, at 16, 24, 32, 48, 64, 128, and 256.
+
 ## Color
 
 | Token | Value | Use |
