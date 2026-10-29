@@ -7,6 +7,7 @@ import {
   ipcSwitchRoom,
   ipcUnlockVaultSolos,
   isTauriRuntime,
+  type ContainmentEvent,
   type ShellPresentation,
 } from '../lib/tauriIpc';
 
@@ -23,6 +24,22 @@ export type WindowId =
   | 'phantom-wallet'
   | 'solflare-wallet'
   | 'backpack-wallet';
+
+export interface HostedAppWindow {
+  key: string;
+  hwnd: string | null;
+  instanceId: string;
+  title: string;
+  appName: string;
+  roomId: string;
+  primary: boolean;
+  embedded: boolean;
+  isMinimized: boolean;
+  isMaximized: boolean;
+  zIndex: number;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+}
 
 export interface OSWindow {
   id: WindowId;
@@ -66,6 +83,7 @@ interface OSStoreState {
   activeRoom: RoomId;
   vault: VaultEnclaveState;
   windows: OSWindow[];
+  hosted: HostedAppWindow[];
   topZIndex: number;
   clonedAppsCount: number;
   auditLogs: AuditLogEntry[];
@@ -98,6 +116,16 @@ interface OSStoreState {
     id: WindowId,
     frame: { x: number; y: number; width: number; height: number },
   ) => void;
+  openHostedApp: (seed: { instanceId: string; appName: string; roomId: string }) => void;
+  applyContainmentEvent: (event: ContainmentEvent) => void;
+  focusHosted: (key: string) => string | null;
+  focusHostedInstance: (instanceId: string) => string | null;
+  minimizeHosted: (key: string) => void;
+  toggleMaximizeHosted: (key: string) => void;
+  moveHosted: (key: string, x: number, y: number) => void;
+  resizeHosted: (key: string, width: number, height: number) => void;
+  removeHosted: (key: string) => void;
+  removeHostedInstance: (instanceId: string) => void;
   toggleShellMode: () => Promise<void>;
   spawnClonedInstance: (targetApp: string, targetRoom: RoomId) => void;
   syncVaultStatus: () => Promise<void>;
@@ -247,6 +275,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
     ipcBridgeMode: isTauriRuntime() ? 'tauri-v2-native' : 'browser-enclave-sim',
   },
   windows: INITIAL_WINDOWS,
+  hosted: [],
   topZIndex: 20,
   clonedAppsCount: 2,
   spotlightOpen: false,
@@ -472,6 +501,162 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
       ),
     })),
 
+  openHostedApp: (seed) =>
+    set((state) => {
+      if (state.hosted.some((win) => win.instanceId === seed.instanceId)) return state;
+      const nextZ = state.topZIndex + 1;
+      const frame = hostedFrame(state.hosted.length);
+      return {
+        topZIndex: nextZ,
+        hosted: [
+          ...state.hosted,
+          {
+            key: `host-pending-${seed.instanceId}`,
+            hwnd: null,
+            instanceId: seed.instanceId,
+            title: seed.appName,
+            appName: seed.appName,
+            roomId: seed.roomId,
+            primary: true,
+            embedded: false,
+            isMinimized: false,
+            isMaximized: false,
+            zIndex: nextZ,
+            position: { x: frame.x, y: frame.y },
+            size: { width: frame.width, height: frame.height },
+          },
+        ],
+      };
+    }),
+
+  applyContainmentEvent: (event) =>
+    set((state) => {
+      if (event.kind === 'exited') {
+        return { hosted: state.hosted.filter((win) => win.instanceId !== event.instanceId) };
+      }
+      if (event.kind === 'destroyed') {
+        return { hosted: state.hosted.filter((win) => win.hwnd !== event.hwnd) };
+      }
+      if (event.kind === 'title') {
+        return {
+          hosted: state.hosted.map((win) =>
+            win.hwnd === event.hwnd ? { ...win, title: event.title || win.title } : win,
+          ),
+        };
+      }
+      const existing = state.hosted.find((win) => win.hwnd === event.hwnd);
+      if (existing) {
+        return {
+          hosted: state.hosted.map((win) =>
+            win.key === existing.key
+              ? { ...win, title: event.title || win.title, embedded: event.embedded, primary: event.primary || win.primary }
+              : win,
+          ),
+        };
+      }
+      const pending = state.hosted.find((win) => win.instanceId === event.instanceId && win.hwnd === null && event.primary);
+      if (pending) {
+        return {
+          hosted: state.hosted.map((win) =>
+            win.key === pending.key
+              ? {
+                  ...win,
+                  key: `host-${event.hwnd}`,
+                  hwnd: event.hwnd,
+                  title: event.title || win.title,
+                  appName: event.appName || win.appName,
+                  roomId: event.roomId || win.roomId,
+                  embedded: event.embedded,
+                  primary: true,
+                }
+              : win,
+          ),
+        };
+      }
+      const nextZ = state.topZIndex + 1;
+      const frame = hostedFrame(state.hosted.length);
+      return {
+        topZIndex: nextZ,
+        hosted: [
+          ...state.hosted,
+          {
+            key: `host-${event.hwnd}`,
+            hwnd: event.hwnd,
+            instanceId: event.instanceId,
+            title: event.title || event.appName,
+            appName: event.appName,
+            roomId: event.roomId,
+            primary: event.primary,
+            embedded: event.embedded,
+            isMinimized: false,
+            isMaximized: false,
+            zIndex: nextZ,
+            position: { x: frame.x, y: frame.y },
+            size: { width: frame.width, height: frame.height },
+          },
+        ],
+      };
+    }),
+
+  focusHosted: (key) => {
+    const win = get().hosted.find((item) => item.key === key);
+    if (!win) return null;
+    const nextZ = get().topZIndex + 1;
+    set((state) => ({
+      topZIndex: nextZ,
+      hosted: state.hosted.map((item) =>
+        item.key === key ? { ...item, isMinimized: false, zIndex: nextZ } : item,
+      ),
+    }));
+    return win.hwnd;
+  },
+
+  focusHostedInstance: (instanceId) => {
+    const group = get().hosted.filter((item) => item.instanceId === instanceId);
+    const win = group.find((item) => item.primary) ?? group[0];
+    if (!win) return null;
+    return get().focusHosted(win.key);
+  },
+
+  minimizeHosted: (key) =>
+    set((state) => ({
+      hosted: state.hosted.map((item) => (item.key === key ? { ...item, isMinimized: true, isMaximized: false } : item)),
+    })),
+
+  toggleMaximizeHosted: (key) =>
+    set((state) => {
+      const nextZ = state.topZIndex + 1;
+      return {
+        topZIndex: nextZ,
+        hosted: state.hosted.map((item) =>
+          item.key === key ? { ...item, isMaximized: !item.isMaximized, isMinimized: false, zIndex: nextZ } : item,
+        ),
+      };
+    }),
+
+  moveHosted: (key, x, y) =>
+    set((state) => ({
+      hosted: state.hosted.map((item) => {
+        if (item.key !== key || item.isMaximized) return item;
+        const frame = clampHosted(x, y, item.size.width, item.size.height);
+        return { ...item, position: { x: frame.x, y: frame.y } };
+      }),
+    })),
+
+  resizeHosted: (key, width, height) =>
+    set((state) => ({
+      hosted: state.hosted.map((item) => {
+        if (item.key !== key || item.isMaximized) return item;
+        const frame = clampHosted(item.position.x, item.position.y, width, height);
+        return { ...item, position: { x: frame.x, y: frame.y }, size: { width: frame.width, height: frame.height } };
+      }),
+    })),
+
+  removeHosted: (key) => set((state) => ({ hosted: state.hosted.filter((item) => item.key !== key) })),
+
+  removeHostedInstance: (instanceId) =>
+    set((state) => ({ hosted: state.hosted.filter((item) => item.instanceId !== instanceId) })),
+
   toggleShellMode: async () => {
     const next = get().shellMode === 'os' ? 'windows' : 'os';
     set({ shellMode: next });
@@ -561,3 +746,18 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
     }));
   },
 }));
+
+function hostedFrame(index: number) {
+  return clampHosted(72 + (index % 5) * 28, 52 + (index % 5) * 24, 960, 620);
+}
+
+function clampHosted(x: number, y: number, width: number, height: number) {
+  if (typeof window === 'undefined') return { x, y, width, height };
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const nextWidth = Math.max(360, Math.min(width, vw - 24));
+  const nextHeight = Math.max(240, Math.min(height, vh - 120));
+  const left = Math.min(Math.max(8, x), Math.max(8, vw - nextWidth - 8));
+  const top = Math.min(Math.max(36, y), Math.max(36, vh - nextHeight - 80));
+  return { x: left, y: top, width: nextWidth, height: nextHeight };
+}

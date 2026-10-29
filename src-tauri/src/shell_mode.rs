@@ -122,10 +122,12 @@ fn place(window: &WebviewWindow, cover_taskbar: bool) -> Result<(), String> {
     #[cfg(windows)]
     sync_window_style(window, cover_taskbar)?;
     if already_placed(window, &bounds) {
+        crate::containment::nudge();
         return Ok(());
     }
     let nudges = NUDGES.load(Ordering::SeqCst);
     if nudges > 6 {
+        crate::containment::nudge();
         return Ok(());
     }
     NUDGES.store(nudges + 1, Ordering::SeqCst);
@@ -135,6 +137,7 @@ fn place(window: &WebviewWindow, cover_taskbar: bool) -> Result<(), String> {
     window
         .set_size(PhysicalSize::new(bounds.width, bounds.height))
         .map_err(|e| e.to_string())?;
+    crate::containment::nudge();
     Ok(())
 }
 
@@ -217,6 +220,7 @@ fn sync_window_style(window: &WebviewWindow, topmost: bool) -> Result<(), String
         };
         SetWindowPos(hwnd, insert_after, 0, 0, 0, 0, flags).map_err(|err| err.to_string())?;
     }
+    crate::containment::nudge();
     Ok(())
 }
 

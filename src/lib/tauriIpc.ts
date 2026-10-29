@@ -71,6 +71,42 @@ export async function ipcSetShellPresentation(mode: ShellPresentation): Promise<
   await invoke('set_shell_presentation', { mode });
 }
 
+export interface ContainmentEvent {
+  kind: 'appeared' | 'title' | 'destroyed' | 'exited';
+  instanceId: string;
+  hwnd: string;
+  title: string;
+  primary: boolean;
+  embedded: boolean;
+  appName: string;
+  roomId: string;
+}
+
+export interface HostSlot {
+  hwnd: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  visible: boolean;
+  raise: boolean;
+}
+
+export async function ipcContainmentSetSlot(slot: HostSlot): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke('containment_set_slot', { slot });
+}
+
+export async function ipcContainmentFocus(hwnd: string): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke('containment_focus', { hwnd });
+}
+
+export async function ipcContainmentClose(hwnd: string): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke('containment_close_window', { hwnd });
+}
+
 export async function ipcGetShellPresentation(): Promise<ShellPresentation> {
   if (!isTauriRuntime()) return 'os';
   const mode = await invoke<string>('get_shell_presentation');

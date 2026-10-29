@@ -1,4 +1,5 @@
 pub mod cloner;
+mod containment;
 pub mod desktop;
 pub mod freezer;
 pub mod quantum_vault;
@@ -619,10 +620,14 @@ pub fn run() {
             sign_with_ram_enclave,
             run_sandboxed_cli_command,
             shell_mode::set_shell_presentation,
-            shell_mode::get_shell_presentation
+            shell_mode::get_shell_presentation,
+            containment::containment_set_slot,
+            containment::containment_focus,
+            containment::containment_close_window
         ])
         .setup(|app| {
             shell_mode::install(app.handle());
+            containment::install(app.handle());
             Ok(())
         })
         .run(tauri::generate_context!())
