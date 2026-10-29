@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { PopupSelect } from './PopupSelect';
+
 const BTN = 'h-[28px] rounded-[6px] border border-white/[0.06] bg-white/[0.05] px-3 text-[13px] font-[510]';
 
 export function VaultPanel({
@@ -117,14 +120,21 @@ export function CloneSheet({
   onClone: (appId: string, room: 'treasury' | 'defi' | 'burner' | 'devnet') => void;
 }) {
   const apps = ['chrome', 'brave', 'cursor', 'vscode', 'telegram', 'discord'] as const;
+  const rooms = [
+    { value: 'treasury', label: 'Main Treasury' },
+    { value: 'defi', label: 'DeFi & Perps Trading' },
+    { value: 'burner', label: 'Burner Minting' },
+    { value: 'devnet', label: 'Devnet Builder' },
+  ] as const;
+  const [app, setApp] = useState<(typeof apps)[number]>('chrome');
+  const [room, setRoom] = useState<(typeof rooms)[number]['value']>('treasury');
   return (
     <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/35" onClick={onCancel}>
       <form
         onClick={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
-          const data = new FormData(event.currentTarget);
-          onClone(String(data.get('app')), data.get('room') as 'treasury');
+          onClone(app, room);
         }}
         className="w-[min(360px,calc(100%-32px))] rounded-[16px] border border-white/[0.06] bg-[#1e1e1e] p-4 shadow-[0_0_0_1px_rgba(0,0,0,0.75)]"
       >
@@ -132,20 +142,21 @@ export function CloneSheet({
         <p className="os-secondary mt-1">Pick an installed Windows .exe and the room namespace.</p>
         <label className="os-label mt-3 block">
           Application
-          <select name="app" className="os-field">
-            {apps.map((app) => (
-              <option key={app} value={app}>{app}</option>
-            ))}
-          </select>
+          <PopupSelect
+            label="Application"
+            value={app}
+            options={apps.map((item) => ({ value: item, label: item }))}
+            onChange={(next) => setApp(next as (typeof apps)[number])}
+          />
         </label>
         <label className="os-label mt-3 block">
           Room
-          <select name="room" className="os-field">
-            <option value="treasury">Main Treasury</option>
-            <option value="defi">DeFi & Perps Trading</option>
-            <option value="burner">Burner Minting</option>
-            <option value="devnet">Devnet Builder</option>
-          </select>
+          <PopupSelect
+            label="Room"
+            value={room}
+            options={rooms.map((item) => ({ value: item.value, label: item.label }))}
+            onChange={(next) => setRoom(next as (typeof rooms)[number]['value'])}
+          />
         </label>
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="os-btn">Cancel</button>
