@@ -62,7 +62,7 @@ Tracked in [#4](https://github.com/ponkssol/Solana-OS/issues/4).
 │       ├── quantum_vault/       vault.solos seal and open
 │       └── security/            Anti-drainer, clipboard, capture affinity
 ├── programs/solana-os-registry/ Anchor identity, recovery, and license program
-├── docs/                        Architecture and roadmap
+├── docs/                        Architecture, roadmap, and the bot roster in docs/team
 └── .github/                     Issue templates, PR template, CI
 ```
 
