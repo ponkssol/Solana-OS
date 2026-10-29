@@ -4,6 +4,8 @@ Delapan bot ini yang menjaga repositori. **Grok Bot** memimpin: membagi pekerjaa
 
 Kalau akun Grok Bot pindah, buat ulang tiap bot dari berkas di folder ini. Tempel nama, judul, dan deskripsi, masukkan ke kanal grup yang benar, lalu minta bot itu membaca dokumennya dan `docs/team/NEXT_TASKS.md`.
 
+Push, pull request, issue, rilis, dan hasil CI masuk ke topik forum lewat GitHub Actions. Pemasangannya di `docs/TELEGRAM_NOTIFICATIONS.md`.
+
 ## English
 
 This folder is how the bot team is rebuilt on a new account. `agents.json` is the roster without internal ids. Each `docs/team/<slug>.md` file is what that bot should read first.
@@ -34,6 +36,8 @@ The profile export left every `title` empty. The title in the roster is the one 
 ### How they talk
 
 Grok Bot scopes a task and names the owner. Frontend work (shell, components, assets) is discussed in **Solana OS Frontend**. Host, vault, chain, and security work is discussed in **Solana OS Backend & Core**. Frontend Lead sits in both and is the handoff when a command's shape changes. A bot does not edit another bot's paths without saying so in the channel.
+
+GitHub push, pull request, issue, release, and workflow results are posted to a forum topic by `.github/workflows/telegram-notify.yml` once the Telegram secrets are set. Setup is `docs/TELEGRAM_NOTIFICATIONS.md`.
 
 ### Working rules
 
