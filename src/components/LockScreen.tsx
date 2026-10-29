@@ -31,8 +31,8 @@ export const LockScreen: React.FC = () => {
       </div>
 
       <div className="absolute left-0 right-0 top-[18vh] text-center">
-        <div className="text-[20px] font-[510] text-white/90">Thursday, October 29</div>
-        <div className="os-clock text-[96px] leading-none tracking-[-0.04em]">01:14</div>
+        <div className="text-[15px] font-[510] text-white/90">Thursday, October 29</div>
+        <div className="os-clock text-[length:var(--os-type-clock)] leading-none tracking-[-0.04em]">01:14</div>
       </div>
 
       <form
@@ -42,17 +42,12 @@ export const LockScreen: React.FC = () => {
           void unlock();
         }}
       >
-        <div className="mb-3 flex size-[74px] items-center justify-center rounded-full bg-[#1a1030] shadow-[0_12px_30px_rgba(0,0,0,0.35)] ring-2 ring-white/30">
+        <div className="mb-3 flex size-[64px] items-center justify-center rounded-full border border-white/[0.06] bg-[#1a1030]">
           <img src={BRAND_ASSETS.emblemOnlyWhite} alt="" className="h-8 w-auto" />
         </div>
-        <div className="mb-3 text-[18px] font-[590]">nanda.solos</div>
+        <div className="mb-3 text-[13px] font-[590]">nanda.solos</div>
         <div
-          className="flex h-[32px] w-full items-center rounded-[1000px] px-4"
-          style={{
-            background: 'rgba(255,255,255,0.18)',
-            backdropFilter: 'blur(40px) saturate(180%)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28)',
-          }}
+          className="flex h-[26px] w-full items-center rounded-full border border-white/[0.06] bg-white/10 px-3"
         >
           <input
             type="password"
@@ -91,7 +86,7 @@ export const LockScreen: React.FC = () => {
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40" onClick={() => setSheet(null)}>
           <div
             onClick={(event) => event.stopPropagation()}
-            className="w-[360px] rounded-[16px] border border-white/20 p-5"
+            className="w-[min(360px,calc(100%-32px))] rounded-[16px] border border-white/[0.06] p-4"
             style={{ background: 'rgba(30,30,30,0.85)', backdropFilter: 'blur(40px)' }}
           >
             <h2 className="mb-2 text-[13px] font-[700]">
@@ -107,7 +102,7 @@ export const LockScreen: React.FC = () => {
             <button
               type="button"
               onClick={() => void unlock()}
-              className="h-[28px] w-full rounded-[6px] bg-[#0088ff] text-[13px] font-[510]"
+              className="os-btn os-btn-primary w-full"
             >
               {busy ? 'Unsealing…' : 'Continue'}
             </button>

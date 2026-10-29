@@ -362,7 +362,7 @@ function ClonerBody({
             vault.solos · ML-KEM-1024 · CRYSTALS-Dilithium
           </div>
         </div>
-        <label className="relative flex h-[28px] w-[168px] items-center gap-1.5 rounded-[6px] border border-white/[0.06] bg-white/[0.05] px-2 focus-within:border-[#0088ff] focus-within:shadow-[0_0_0_3px_rgba(0,136,255,0.35)]">
+        <label className="relative flex h-[26px] w-[168px] items-center gap-1.5 rounded-[6px] border border-white/[0.06] bg-white/[0.05] px-2 focus-within:border-[#0A84FF]">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a8a8a" strokeWidth="2" aria-hidden>
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-3.2-3.2" strokeLinecap="round" />
@@ -420,7 +420,7 @@ function ClonerBody({
         <button type="button" onClick={onFreeze} className="h-[28px] rounded-[6px] border border-white/[0.06] bg-white/[0.05] px-3 text-[13px] font-[510]">
           Freeze Process
         </button>
-        <button type="button" onClick={onLaunch} className="h-[28px] rounded-[6px] bg-[#0088ff] px-3 text-[13px] font-[510] text-white">
+        <button type="button" onClick={onLaunch} className="os-btn os-btn-primary">
           Launch in Enclave
         </button>
       </div>

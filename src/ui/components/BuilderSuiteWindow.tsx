@@ -183,7 +183,7 @@ export const BuilderSuiteWindow: React.FC<BuilderSuiteWindowProps> = ({
             </button>
             <button
               type="button"
-              className="flex-1 rounded-lg bg-gradient-to-r from-emerald-400 to-[#14F195] py-1.5 font-sans text-[11px] font-bold text-slate-950 shadow"
+              className="h-[26px] flex-1 rounded-[6px] bg-[#0A84FF] font-sans text-[13px] font-medium text-white"
             >
               Deploy ({clusterTarget})
             </button>

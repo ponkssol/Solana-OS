@@ -22,7 +22,7 @@ export function MacOSDialogModal({
         <button
           type="button"
           onClick={onSign}
-          className="h-[28px] w-full rounded-[6px] bg-[#0088ff] text-[13px] font-[510] text-white"
+          className="os-btn os-btn-primary w-full"
         >
           Sign with Hardware Enclave
         </button>

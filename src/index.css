@@ -23,6 +23,20 @@ body,
   user-select: none;
 }
 
+body {
+  font-size: var(--os-type-body);
+  line-height: 16px;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: var(--os-type-body);
+  line-height: 16px;
+}
+
 .os-clock {
   font-family: "SF Pro Rounded", ui-rounded, "Avenir Next", "Segoe UI", sans-serif;
   font-weight: 600;
@@ -30,18 +44,83 @@ body,
 }
 
 :root {
+  --os-type-body: 13px;
+  --os-type-label: 11px;
+  --os-type-secondary: 12px;
+  --os-type-title: 13px;
+  --os-type-sheet: 13px;
+  --os-type-menu: 13px;
+  --os-type-clock: 96px;
+  --os-control-height: 26px;
+  --os-accent: #0a84ff;
+  --os-hairline: rgba(255, 255, 255, 0.06);
   --window-background-dark: #1e1e1e;
   --sidebar-bg-active-dark: #141517;
   --labels-primary-dark: rgba(255, 255, 255, 0.85);
   --labels-secondary-dark: rgba(255, 255, 255, 0.55);
   --labels-vibrant-primary-dark: #f5f5f5;
   --labels-vibrant-secondary-dark: #8a8a8a;
-  --accents-blue: #0088ff;
+  --accents-blue: #0a84ff;
   --accents-vibrant-blue-dark: #0a99ff;
   --accents-red: #ff383c;
   --table-alternating-row-dark: rgba(255, 255, 255, 0.04);
   --window-radius: 16px;
   --dock-radius: 15px;
   --pill-radius: 1000px;
-  --toolbar-item-height: 36px;
+  --toolbar-item-height: 28px;
+}
+
+.os-sheet-title {
+  font-size: var(--os-type-sheet);
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.os-label {
+  font-size: var(--os-type-label);
+  font-weight: 500;
+  line-height: 14px;
+  color: #8a8a8a;
+}
+
+.os-secondary {
+  font-size: var(--os-type-secondary);
+  line-height: 16px;
+  color: #8a8a8a;
+}
+
+.os-btn {
+  height: var(--os-control-height);
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--os-hairline);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: var(--os-type-body);
+  font-weight: 510;
+  line-height: 16px;
+  color: #f5f5f5;
+}
+
+.os-btn-primary {
+  border-color: transparent;
+  background: var(--os-accent);
+  color: #ffffff;
+}
+
+.os-field {
+  display: block;
+  height: var(--os-control-height);
+  width: 100%;
+  margin-top: 4px;
+  border-radius: 6px;
+  border: 1px solid var(--os-hairline);
+  background-color: rgba(255, 255, 255, 0.05);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%238a8a8a' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding: 0 24px 0 8px;
+  font-size: var(--os-type-secondary);
+  line-height: 16px;
+  color: #f5f5f5;
+  appearance: none;
 }

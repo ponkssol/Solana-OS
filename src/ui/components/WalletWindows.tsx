@@ -254,7 +254,7 @@ export const WalletWindows: React.FC<WalletWindowsProps> = ({
         {/* Left 6 Cols: Native Portfolio + Hardware Signer Status */}
         <div className="col-span-6 flex flex-col justify-between space-y-3">
           {/* Balance Card */}
-          <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-white/[0.09] to-white/[0.03] p-3.5">
+          <div className="rounded-[6px] border border-white/[0.06] bg-white/[0.05] p-3.5">
             <div className="flex items-center justify-between text-[11px] text-white/65">
               <span className="font-semibold text-white/90">{profile.accountName}</span>
               <span className="rounded-md bg-white/10 px-1.5 py-0.5 font-mono text-[10px]">
@@ -393,7 +393,7 @@ export const WalletWindows: React.FC<WalletWindowsProps> = ({
               onClick={() =>
                 onApproveSimulatedTx?.(activeBrand, profile.pendingSimulation.txId)
               }
-              className="flex-1 rounded-xl bg-gradient-to-r from-[#14F195] to-emerald-400 py-2 text-xs font-bold text-slate-950 shadow-[0_4px_16px_rgba(20,241,149,0.35)] transition hover:brightness-105"
+              className="h-[26px] flex-1 rounded-[6px] bg-[#0A84FF] text-[13px] font-medium text-white"
             >
               Sign in Enclave ↵
             </button>

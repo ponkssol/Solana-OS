@@ -111,7 +111,7 @@ export const AppClonerWindow: React.FC<AppClonerWindowProps> = ({
         <button
           type="button"
           onClick={onCloneNew}
-          className="rounded-lg bg-gradient-to-r from-sky-500 to-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-[0_4px_12px_rgba(14,165,233,0.35)] transition hover:brightness-110"
+          className="h-[26px] rounded-[6px] border border-white/[0.06] bg-[#0A84FF] px-2.5 text-[13px] font-medium text-white"
         >
           + Clone App
         </button>

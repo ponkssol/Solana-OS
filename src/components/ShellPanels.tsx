@@ -46,7 +46,7 @@ export function ShieldPanel({
           <div key={line}>{line}</div>
         ))}
       </div>
-      <button type="button" className="h-[28px] w-fit rounded-[6px] bg-[#0088ff] px-3 text-[13px] font-[510]" onClick={onSimulate}>
+      <button type="button" className="os-btn os-btn-primary w-fit" onClick={onSimulate}>
         Run live transaction simulation
       </button>
     </div>
@@ -96,7 +96,7 @@ export function WalletPanel({
         <h2 className="font-[700]">{title} · standalone</h2>
         <button type="button" onClick={onClose} className={BTN}>Close</button>
       </div>
-      <div className="text-[22px] font-[700]">142.85 SOL</div>
+      <div className="text-[15px] font-[600]">142.85 SOL</div>
       <div className="text-[12px] text-[#8a8a8a]">$34,812.40 · window.solana bridge isolated</div>
       <div className="mt-3 space-y-2">
         {['SOL  142.85', 'JUP  4,250.00', 'USDC  1,426.60'].map((token) => (
@@ -126,21 +126,21 @@ export function CloneSheet({
           const data = new FormData(event.currentTarget);
           onClone(String(data.get('app')), data.get('room') as 'treasury');
         }}
-        className="w-[min(420px,calc(100%-32px))] rounded-[16px] border border-white/[0.07] bg-[#1e1e1e] p-5 shadow-[0_0_0_1px_rgba(0,0,0,0.75)]"
+        className="w-[min(360px,calc(100%-32px))] rounded-[16px] border border-white/[0.06] bg-[#1e1e1e] p-4 shadow-[0_0_0_1px_rgba(0,0,0,0.75)]"
       >
-        <h2 className="text-[14px] font-[700]">Clone New App Instance</h2>
-        <p className="mt-1 text-[12px] text-[#8a8a8a]">Pick an installed Windows .exe and the room namespace.</p>
-        <label className="mt-4 block text-[12px] text-[#8a8a8a]">
+        <h2 className="os-sheet-title">Clone New App Instance</h2>
+        <p className="os-secondary mt-1">Pick an installed Windows .exe and the room namespace.</p>
+        <label className="os-label mt-3 block">
           Application
-          <select name="app" className="mt-1 h-[28px] w-full rounded-[6px] border border-white/[0.06] bg-[#2a2a2c] px-2 text-white">
+          <select name="app" className="os-field">
             {apps.map((app) => (
               <option key={app} value={app}>{app}</option>
             ))}
           </select>
         </label>
-        <label className="mt-3 block text-[12px] text-[#8a8a8a]">
+        <label className="os-label mt-3 block">
           Room
-          <select name="room" className="mt-1 h-[28px] w-full rounded-[6px] border border-white/[0.06] bg-[#2a2a2c] px-2 text-white">
+          <select name="room" className="os-field">
             <option value="treasury">Main Treasury</option>
             <option value="defi">DeFi & Perps Trading</option>
             <option value="burner">Burner Minting</option>
@@ -148,8 +148,8 @@ export function CloneSheet({
           </select>
         </label>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="h-[28px] rounded-[6px] border border-white/[0.06] px-3">Cancel</button>
-          <button type="submit" className="h-[28px] rounded-[6px] bg-[#0088ff] px-3">Clone</button>
+          <button type="button" onClick={onCancel} className="os-btn">Cancel</button>
+          <button type="submit" className="os-btn os-btn-primary">Clone</button>
         </div>
       </form>
     </div>
