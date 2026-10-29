@@ -1,4 +1,5 @@
 import React from 'react';
+import { ipcContainmentFocus } from '../lib/tauriIpc';
 import { useOSStore, WindowId } from '../store/useOSStore';
 import { DOCK_ICONS, DockGlass, FIGMA } from './macosMaterials';
 
@@ -14,7 +15,13 @@ const APP_SLOTS: { label: string; windowId: WindowId }[] = [
 ];
 
 export const FloatingDock: React.FC = () => {
-  const { openWindow, focusWindow, setShellView, setWalletBrand } = useOSStore();
+  const { openWindow, focusWindow, setShellView, setWalletBrand, hosted } = useOSStore();
+  const seen = new Set<string>();
+  const running = hosted.filter((win) => {
+    if (seen.has(win.instanceId)) return false;
+    seen.add(win.instanceId);
+    return true;
+  });
   const openView = (index: number) => {
     openWindow('app-cloner');
     focusWindow('app-cloner');
@@ -58,6 +65,23 @@ export const FloatingDock: React.FC = () => {
       >
         &gt;_
       </button>
+      {running.map((app) => (
+        <button
+          key={app.instanceId}
+          type="button"
+          aria-label={app.appName}
+          onClick={() => {
+            const hwnd = useOSStore.getState().focusHostedInstance(app.instanceId);
+            if (hwnd) void ipcContainmentFocus(hwnd);
+          }}
+          className="relative mb-[4px] flex h-[47px] w-[36px] flex-col items-center"
+        >
+          <span className="flex size-[36px] items-center justify-center rounded-[8px] bg-[#1e1e1e] text-[15px] font-[700] text-white/85">
+            {(app.appName.trim()[0] || 'A').toUpperCase()}
+          </span>
+          <span className="absolute bottom-0 size-1 rounded-full bg-white/80" />
+        </button>
+      ))}
       <img src="/icons/folder.svg" alt="" className="mb-[4px] size-[36px]" />
       <img src={`${FIGMA}/cc48b.png`} alt="" className="mb-[4px] size-[36px] object-contain" />
     </div>

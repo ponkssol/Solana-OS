@@ -15,6 +15,7 @@ export interface SandboxInstance {
   room: RoomKey;
   frozen: boolean;
   walletBrand: WalletBrand | null;
+  appId?: string;
 }
 
 export interface EnclaveSnapshot {
@@ -27,6 +28,15 @@ export interface EnclaveSnapshot {
   hardwareShard: string;
   keyId: string;
   sandboxes: SandboxInstance[];
+  launched?: LaunchedApp | null;
+  launchFailed?: boolean;
+}
+
+export interface LaunchedApp {
+  instanceId: string;
+  appName: string;
+  roomId: string;
+  pid: number;
 }
 
 export interface CliResult {
@@ -99,12 +109,53 @@ export async function getEnclaveStatus(): Promise<EnclaveSnapshot> {
 }
 
 export async function cloneAppInstance(appId: string, room: RoomKey): Promise<EnclaveSnapshot> {
-  await touch('clone_app_instance', { appId, roomId: room });
-  const id = `clone-${Date.now()}`;
-  memory.sandboxes.unshift(
-    row(id, `${appId} clone`, 'ephemeral.solos', `PID ${4000 + memory.sandboxes.length} · Landlock`, 'Verified Active', '#14f195', room, false, null),
-  );
-  return snapshot();
+  let launched: LaunchedApp | null = null;
+  let launchFailed = false;
+  if (isTauriRuntime()) {
+    try {
+      const inst = await invoke<{ instanceId: string; appName: string; roomId: string; pid: number }>('clone_app_instance', {
+        appId,
+        roomId: room,
+      });
+      launched = {
+        instanceId: inst.instanceId,
+        appName: inst.appName,
+        roomId: inst.roomId,
+        pid: inst.pid,
+      };
+    } catch {
+      launchFailed = true;
+    }
+  } else {
+    launched = {
+      instanceId: `preview-${Date.now()}`,
+      appName: appLabel(appId),
+      roomId: room,
+      pid: 0,
+    };
+  }
+  if (launched && !launchFailed) {
+    const created = row(
+      launched.instanceId,
+      launched.appName,
+      'ephemeral.solos',
+      `PID ${launched.pid || 4000 + memory.sandboxes.length} · contained`,
+      'Inside Solana OS',
+      '#14f195',
+      room,
+      false,
+      null,
+    );
+    created.appId = appId;
+    memory.sandboxes.unshift(created);
+  }
+  return { ...snapshot(), launched, launchFailed };
+}
+
+function appLabel(appId: string): string {
+  if (appId === 'vscode') return 'VS Code';
+  if (appId === 'chrome') return 'Chrome';
+  return appId.slice(0, 1).toUpperCase() + appId.slice(1);
 }
 
 export async function toggleFreezeProcess(id: string): Promise<EnclaveSnapshot> {

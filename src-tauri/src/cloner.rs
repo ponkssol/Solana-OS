@@ -605,24 +605,25 @@ impl UniversalAppCloner {
             DEFAULT_WINDOWS_DESKTOP.to_string()
         };
 
+        let display_name = match request.instance_label {
+            Some(ref label) if !label.trim().is_empty() => {
+                format!("{} ({})", app_name, label.trim())
+            }
+            _ => app_name.clone(),
+        };
+
+        let seq = self.next_instance_seq;
+        self.next_instance_seq += 1;
         let pid = self.spawn_isolated_process(
             &exe_path,
             &launch_args,
             &dirs,
             &manifest,
             &target_desktop,
+            seq,
+            &display_name,
         )?;
-
-        let seq = self.next_instance_seq;
-        self.next_instance_seq += 1;
         let instance_id = format!("{}-{}-{}-{}", clean_room, clean_app, seq, pid);
-
-        let display_name = match request.instance_label {
-            Some(ref label) if !label.trim().is_empty() => {
-                format!("{} ({})", app_name, label.trim())
-            }
-            _ => app_name,
-        };
 
         let instance = ClonedAppInstance {
             instance_id: instance_id.clone(),
@@ -674,7 +675,9 @@ impl UniversalAppCloner {
             .ok_or_else(|| format!("App instance '{}' not found", instance_id))?;
 
         let pid = instance.pid;
+        let tracked_id = instance.instance_id.clone();
         if instance.status != AppInstanceStatus::Stopped {
+            crate::containment::release(&tracked_id);
             #[cfg(target_os = "windows")]
             {
                 let _ = terminate_windows_process(pid);
@@ -706,16 +709,19 @@ impl UniversalAppCloner {
         dirs: &IsolatedRoomDirectories,
         manifest: &RegistryOverrideManifest,
         desktop_name: &str,
+        instance_seq: u64,
+        app_name: &str,
     ) -> Result<u32, String> {
-        // Configure per-room isolated HKCU registry key in Windows Registry
+        use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::Threading::TerminateProcess;
+
         let subkey_path = format!(
             r"Software\SolanaOS\Rooms\{}\Apps\{}\HKCU_Root",
             manifest.room_id, manifest.app_id
         );
         configure_windows_registry_sandbox(&subkey_path)?;
 
-        // Launch the process via CreateProcessW onto the target desktop with isolated environment
-        let pid = crate::desktop::launch_process_on_desktop_win32(
+        let launched = crate::desktop::launch_process_on_desktop_win32(
             exe_path,
             args,
             &manifest.env_overrides,
@@ -723,10 +729,30 @@ impl UniversalAppCloner {
             desktop_name,
         )?;
 
-        // Assign process to a Windows Job Object for clean sandbox lifecycle
-        let _ = assign_pid_to_room_job_object(&manifest.room_id, pid);
+        // Job membership has to land before the primary thread runs, or Chrome-style
+        // trees spawn children that never join the job and show up on the real desktop.
+        let instance_id = format!(
+            "{}-{}-{}-{}",
+            manifest.room_id, manifest.app_id, instance_seq, launched.pid
+        );
+        crate::containment::enroll(
+            &instance_id,
+            launched.process,
+            launched.pid,
+            app_name,
+            &manifest.room_id,
+        );
 
-        Ok(pid)
+        let resume_res = crate::desktop::resume_suspended_thread(launched.thread);
+        unsafe {
+            let _ = CloseHandle(launched.thread);
+            if resume_res.is_err() {
+                let _ = TerminateProcess(launched.process, 1);
+            }
+            let _ = CloseHandle(launched.process);
+        }
+        resume_res?;
+        Ok(launched.pid)
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -737,6 +763,8 @@ impl UniversalAppCloner {
         dirs: &IsolatedRoomDirectories,
         manifest: &RegistryOverrideManifest,
         _desktop_name: &str,
+        _instance_seq: u64,
+        _app_name: &str,
     ) -> Result<u32, String> {
         // On Linux/Unix development & test hosts, if the executable exists and is runnable,
         // or if we are simulating a Windows .exe binary inside the room sandbox, we spawn a
@@ -826,29 +854,6 @@ fn configure_windows_registry_sandbox(subkey_path: &str) -> Result<(), String> {
         let _ = RegCloseKey(isolated_hkey);
     }
     Ok(())
-}
-
-#[cfg(target_os = "windows")]
-fn assign_pid_to_room_job_object(room_id: &str, pid: u32) -> Result<(), String> {
-    use windows::core::PCWSTR;
-    use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::JobObjects::{AssignProcessToJobObject, CreateJobObjectW};
-    use windows::Win32::System::Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE};
-
-    unsafe {
-        let job_name = to_wide_null(&format!("Local\\SolanaOS_RoomJob_{}", room_id));
-        let job_handle =
-            CreateJobObjectW(None, PCWSTR(job_name.as_ptr())).map_err(|e| e.to_string())?;
-        let proc_handle =
-            OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, pid).map_err(|e| {
-                let _ = CloseHandle(job_handle);
-                e.to_string()
-            })?;
-        let assign_res = AssignProcessToJobObject(job_handle, proc_handle);
-        let _ = CloseHandle(proc_handle);
-        let _ = CloseHandle(job_handle);
-        assign_res.map_err(|e| format!("AssignProcessToJobObject failed: {}", e))
-    }
 }
 
 #[cfg(target_os = "windows")]

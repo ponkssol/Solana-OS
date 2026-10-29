@@ -12,6 +12,7 @@ import { OSWindow, useOSStore, WindowId } from '../store/useOSStore';
 import { MacOSDialogModal } from './MacOSDialogModal';
 import { SidebarVibrancy, Stoplights } from './macosMaterials';
 import { BuilderPanel, CloneSheet, ShieldPanel, VaultPanel, WalletPanel } from './ShellPanels';
+import { HostedApps } from './HostedApps';
 import { TerminalWindow } from './TerminalWindow';
 
 const SIDEBAR = [
@@ -124,8 +125,28 @@ export const WindowManager: React.FC = () => {
 
   const selected = rows.find((item) => item.id === selectedId) ?? shown[0];
 
+  const launchClone = (appId: string, room: 'treasury' | 'defi' | 'burner' | 'devnet') => {
+    void cloneAppInstance(appId, room).then((next) => {
+      setRows(next.sandboxes);
+      setCloneOpen(false);
+      if (next.launchFailed) {
+        setNotice('Could not launch that app inside Solana OS.');
+        return;
+      }
+      if (next.launched) {
+        useOSStore.getState().openHostedApp({
+          instanceId: next.launched.instanceId,
+          appName: next.launched.appName,
+          roomId: next.launched.roomId,
+        });
+      }
+      setShellView('sandboxes');
+    });
+  };
+
   return (
     <div className="absolute inset-0" onMouseMove={onMove} onMouseUp={() => setDraggingId(null)}>
+      <HostedApps />
       {visible.map((win) => (
         <WindowFrame
           key={win.id}
@@ -172,7 +193,13 @@ export const WindowManager: React.FC = () => {
                 onClone={() => setCloneOpen(true)}
                 onFreeze={() => selected && void toggleFreezeProcess(selected.id).then((next) => setRows(next.sandboxes))}
                 onTerminate={() => selected && void terminateSandbox(selected.id).then((next) => setRows(next.sandboxes))}
-                onLaunch={() => selected?.walletBrand && setWalletBrand(selected.walletBrand)}
+                onLaunch={() => {
+                  if (selected?.appId) {
+                    launchClone(selected.appId, selected.room);
+                    return;
+                  }
+                  if (selected?.walletBrand) setWalletBrand(selected.walletBrand);
+                }}
               />
             )
           ) : (
@@ -188,13 +215,7 @@ export const WindowManager: React.FC = () => {
       {cloneOpen && (
         <CloneSheet
           onCancel={() => setCloneOpen(false)}
-          onClone={(appId, room) => {
-            void cloneAppInstance(appId, room).then((next) => {
-              setRows(next.sandboxes);
-              setCloneOpen(false);
-              setShellView('sandboxes');
-            });
-          }}
+          onClone={launchClone}
         />
       )}
       {simulationOpen && shellView === 'sandboxes' && (

@@ -252,8 +252,17 @@ fn emergency_restore_default_desktop_win32() -> Result<(), String> {
     switch_desktop_win32(DEFAULT_WINDOWS_DESKTOP)
 }
 
+/// A process created with `CREATE_SUSPENDED`. The caller assigns the job, then resumes.
+#[cfg(target_os = "windows")]
+pub struct SuspendedLaunch {
+    pub pid: u32,
+    pub process: windows::Win32::Foundation::HANDLE,
+    pub thread: windows::Win32::Foundation::HANDLE,
+}
+
 /// Launches a Windows process directly onto `desktop_name` (`"Default"` or `"SolanaOS_Enclave_Desktop"`)
 /// using `CreateProcessW` with `STARTUPINFOW.lpDesktop` and an isolated Unicode environment block.
+/// The primary thread is left suspended so the caller can put the process in a job before any child starts.
 #[cfg(target_os = "windows")]
 pub fn launch_process_on_desktop_win32(
     exe_path: &str,
@@ -261,13 +270,12 @@ pub fn launch_process_on_desktop_win32(
     env_overrides: &HashMap<String, String>,
     working_dir: &Path,
     desktop_name: &str,
-) -> Result<u32, String> {
+) -> Result<SuspendedLaunch, String> {
     use std::env;
     use windows::core::{PCWSTR, PWSTR};
-    use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::System::Threading::{
-        CreateProcessW, CREATE_NEW_CONSOLE, CREATE_UNICODE_ENVIRONMENT, PROCESS_INFORMATION,
-        STARTUPINFOW,
+        CreateProcessW, CREATE_NEW_CONSOLE, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT,
+        PROCESS_INFORMATION, STARTUPINFOW,
     };
 
     if desktop_name == SOLANA_OS_ENCLAVE_DESKTOP {
@@ -320,7 +328,7 @@ pub fn launch_process_on_desktop_win32(
             None,
             None,
             false,
-            CREATE_UNICODE_ENVIRONMENT | CREATE_NEW_CONSOLE,
+            CREATE_UNICODE_ENVIRONMENT | CREATE_NEW_CONSOLE | CREATE_SUSPENDED,
             Some(env_block_u16.as_ptr() as *const _),
             PCWSTR(work_dir_wide.as_ptr()),
             &startup_info,
@@ -333,10 +341,24 @@ pub fn launch_process_on_desktop_win32(
             )
         })?;
 
-        let pid = proc_info.dwProcessId;
-        let _ = CloseHandle(proc_info.hThread);
-        let _ = CloseHandle(proc_info.hProcess);
-        Ok(pid)
+        Ok(SuspendedLaunch {
+            pid: proc_info.dwProcessId,
+            process: proc_info.hProcess,
+            thread: proc_info.hThread,
+        })
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn resume_suspended_thread(thread: windows::Win32::Foundation::HANDLE) -> Result<(), String> {
+    use windows::Win32::System::Threading::ResumeThread;
+    unsafe {
+        let prev = ResumeThread(thread);
+        if prev == u32::MAX {
+            Err("ResumeThread failed".to_string())
+        } else {
+            Ok(())
+        }
     }
 }
 
