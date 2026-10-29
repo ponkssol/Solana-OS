@@ -42,20 +42,12 @@ export const GlassWindow: React.FC<WindowControlProps> = ({
       id={id}
       className={`relative flex flex-col overflow-hidden rounded-[22px] border text-white select-none ${
         isFrozen
-          ? 'border-sky-400/40'
-          : isFocused
-          ? 'border-white/[0.22]'
-          : 'border-white/[0.12] opacity-90'
+          ? 'border-[#0A84FF]/40'
+          : 'border-white/[0.06]'
       } ${className}`}
       style={{
-        background: isFrozen
-          ? 'linear-gradient(155deg, rgba(14, 30, 52, 0.72) 0%, rgba(10, 16, 30, 0.84) 100%)'
-          : 'linear-gradient(155deg, rgba(22, 25, 42, 0.68) 0%, rgba(11, 14, 25, 0.82) 100%)',
-        backdropFilter: 'blur(42px) saturate(190%)',
-        WebkitBackdropFilter: 'blur(42px) saturate(190%)',
-        boxShadow: isFocused
-          ? '0 28px 70px rgba(0, 0, 0, 0.56), 0 8px 24px rgba(0, 0, 0, 0.34)'
-          : '0 16px 40px rgba(0, 0, 0, 0.38)',
+        background: '#1e1e1e',
+        boxShadow: 'none',
       }}
     >
       <SpecularBorder

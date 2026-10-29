@@ -85,14 +85,14 @@ export const TRAFFIC_LIGHTS = {
 } as const;
 
 export const SQUIRCLE_GRADIENTS = {
-  solos: 'linear-gradient(145deg, #1e1b4b, #090d16)',
-  cloner: 'linear-gradient(145deg, #0ea5e9, #2563eb)',
-  phantom: 'linear-gradient(145deg, #a855f7, #6366f1)',
-  solflare: 'linear-gradient(145deg, #f97316, #ea580c)',
-  backpack: 'linear-gradient(145deg, #ef4444, #b91c1c)',
-  browser: 'linear-gradient(145deg, #3b82f6, #1d4ed8)',
-  cursor: 'linear-gradient(145deg, #334155, #0f172a)',
-  anchor: 'linear-gradient(145deg, #10b981, #059669)',
-  vault: 'linear-gradient(145deg, #ec4899, #8b5cf6)',
-  burner: 'linear-gradient(145deg, #f59e0b, #dc2626)',
+  solos: '#14151c',
+  cloner: '#0A84FF',
+  phantom: '#7c5cbf',
+  solflare: '#ea580c',
+  backpack: '#b91c1c',
+  browser: '#0A84FF',
+  cursor: '#1e293b',
+  anchor: '#059669',
+  vault: '#7c3aed',
+  burner: '#d97706',
 } as const;

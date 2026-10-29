@@ -3,9 +3,11 @@ import { ROOM_CONFIGS, RoomId } from '../tokens/designTokens';
 import {
   ipcGetVaultStatus,
   ipcLockVaultSolos,
+  ipcSetShellPresentation,
   ipcSwitchRoom,
   ipcUnlockVaultSolos,
   isTauriRuntime,
+  type ShellPresentation,
 } from '../lib/tauriIpc';
 
 export type OSScreenState = 'boot' | 'lock' | 'desktop';
@@ -74,6 +76,7 @@ interface OSStoreState {
   walletBrand: WalletBrandName | null;
   settingsOpen: boolean;
   terminalOpen: boolean;
+  shellMode: ShellPresentation;
   processFreezeActive: boolean;
   frozenProcessCount: number;
 
@@ -91,6 +94,11 @@ interface OSStoreState {
   toggleMaximizeWindow: (id: WindowId) => void;
   focusWindow: (id: WindowId) => void;
   updateWindowPosition: (id: WindowId, x: number, y: number) => void;
+  updateWindowFrame: (
+    id: WindowId,
+    frame: { x: number; y: number; width: number; height: number },
+  ) => void;
+  toggleShellMode: () => Promise<void>;
   spawnClonedInstance: (targetApp: string, targetRoom: RoomId) => void;
   syncVaultStatus: () => Promise<void>;
   toggleWindowFreeze: (id: WindowId) => void;
@@ -248,6 +256,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
   walletBrand: null,
   settingsOpen: false,
   terminalOpen: false,
+  shellMode: 'os',
   processFreezeActive: true,
   frozenProcessCount: 3,
   auditLogs: [
@@ -453,6 +462,25 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
         w.id === id ? { ...w, position: { x, y } } : w
       ),
     })),
+
+  updateWindowFrame: (id, frame) =>
+    set((state) => ({
+      windows: state.windows.map((w) =>
+        w.id === id
+          ? { ...w, position: { x: frame.x, y: frame.y }, size: { width: frame.width, height: frame.height } }
+          : w
+      ),
+    })),
+
+  toggleShellMode: async () => {
+    const next = get().shellMode === 'os' ? 'windows' : 'os';
+    set({ shellMode: next });
+    try {
+      await ipcSetShellPresentation(next);
+    } catch {
+      set({ shellMode: next === 'os' ? 'windows' : 'os' });
+    }
+  },
 
   spawnClonedInstance: (targetApp, targetRoom) =>
     set((state) => ({

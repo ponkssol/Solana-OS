@@ -1,9 +1,11 @@
+import { BRAND_ASSETS } from '../tokens/designTokens';
+
 export function SystemSettingsModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={onClose}>
       <section
         onClick={(event) => event.stopPropagation()}
-        className="flex h-[520px] w-[760px] overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#1e1e1e] shadow-[0_0_0_1px_rgba(0,0,0,0.75),0_18px_54px_rgba(0,0,0,0.57)]"
+        className="flex h-[min(520px,calc(100%-48px))] w-[min(760px,calc(100%-48px))] overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#1e1e1e] shadow-[0_0_0_1px_rgba(0,0,0,0.75),0_18px_54px_rgba(0,0,0,0.57)]"
       >
         <aside className="w-[210px] border-r border-white/[0.04] bg-[#141517] p-4 text-[13px]">
           <div className="mb-3 text-[11px] font-[700] uppercase tracking-wide text-[#8a8a8a]">System Settings</div>
@@ -14,9 +16,19 @@ export function SystemSettingsModal({ onClose }: { onClose: () => void }) {
           ))}
         </aside>
         <div className="flex flex-1 flex-col p-5 text-[13px]">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-[15px] font-[700]">Solana OS Settings</h2>
-            <button type="button" onClick={onClose} className="h-[28px] rounded-[6px] border border-white/[0.06] px-3">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <img
+                src={BRAND_ASSETS.logoWhite}
+                alt="SOLANA OS"
+                width={2172}
+                height={724}
+                draggable={false}
+                className="mb-2 block h-auto w-[180px]"
+              />
+              <h2 className="text-[13px] font-[600]">Solana OS Settings</h2>
+            </div>
+            <button type="button" onClick={onClose} className="os-btn shrink-0">
               Done
             </button>
           </div>

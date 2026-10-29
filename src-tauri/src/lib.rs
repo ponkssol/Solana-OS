@@ -4,6 +4,7 @@ pub mod freezer;
 pub mod quantum_vault;
 pub mod sandbox;
 pub mod security;
+mod shell_mode;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -616,8 +617,14 @@ pub fn run() {
             unlock_vault_container,
             simulate_solana_tx,
             sign_with_ram_enclave,
-            run_sandboxed_cli_command
+            run_sandboxed_cli_command,
+            shell_mode::set_shell_presentation,
+            shell_mode::get_shell_presentation
         ])
+        .setup(|app| {
+            shell_mode::install(app.handle());
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running Solana OS Tauri application");
 }

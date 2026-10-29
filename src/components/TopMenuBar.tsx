@@ -27,6 +27,8 @@ export const TopMenuBar: React.FC = () => {
     setShellView,
     setSettingsOpen,
     openWindow: openApp,
+    shellMode,
+    toggleShellMode,
   } = useOSStore();
   const [controlOpen, setControlOpen] = useState(false);
   const [volume, setVolume] = useState(68);
@@ -90,11 +92,37 @@ export const TopMenuBar: React.FC = () => {
             </div>
           )}
         </div>
-        <div className="flex gap-[8px] pl-[9px] text-[13.1px] font-[590] leading-[16px]">
+        <div className="flex gap-[8px] pl-[9px] text-[13px] font-[590] leading-[16px]">
           <span>Thu Oct 29</span>
           <span>9:41 AM</span>
         </div>
+        <button
+          type="button"
+          onClick={() => void toggleShellMode()}
+          aria-label={shellMode === 'os' ? 'Windows mode' : 'Fullscreen'}
+          title={shellMode === 'os' ? 'Windows mode' : 'Fullscreen'}
+          className="ml-[8px] flex size-[22px] items-center justify-center rounded-[6px] text-white/90 hover:bg-white/10"
+        >
+          {shellMode === 'os' ? <WindowedIcon /> : <FullscreenIcon />}
+        </button>
       </div>
     </header>
   );
 };
+
+function FullscreenIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M2.2 5.1V2.4h2.7M8.1 2.4h2.7v2.7M10.8 7.9v2.7H8.1M4.9 10.6H2.2V7.9" />
+    </svg>
+  );
+}
+
+function WindowedIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="1.6" y="2.2" width="9.8" height="7.4" rx="1.2" />
+      <path d="M1.6 7.6h9.8" />
+    </svg>
+  );
+}

@@ -13,7 +13,7 @@ const NOTES = [
 
 export function NotificationStack() {
   return (
-    <div className="pointer-events-none absolute right-4 top-[49px] z-30 flex w-[344px] flex-col gap-4">
+    <div className="pointer-events-none absolute right-4 top-12 z-30 flex w-[min(344px,calc(100%-2rem))] flex-col gap-3">
       {NOTES.map((note) => (
         <article
           key={note.title}
