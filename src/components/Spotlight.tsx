@@ -39,7 +39,7 @@ export const Spotlight: React.FC = () => {
       onClick={() => setSpotlightOpen(false)}
     >
       <div
-        className="w-[640px] overflow-hidden rounded-[18px] border border-white/25"
+        className="w-[min(640px,calc(100%-32px))] overflow-hidden rounded-[18px] border border-white/25"
         style={{
           background: 'rgba(30, 30, 34, 0.72)',
           backdropFilter: 'blur(40px) saturate(180%)',

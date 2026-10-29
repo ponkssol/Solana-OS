@@ -3,7 +3,7 @@ export function SystemSettingsModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={onClose}>
       <section
         onClick={(event) => event.stopPropagation()}
-        className="flex h-[520px] w-[760px] overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#1e1e1e] shadow-[0_0_0_1px_rgba(0,0,0,0.75),0_18px_54px_rgba(0,0,0,0.57)]"
+        className="flex h-[min(520px,calc(100%-48px))] w-[min(760px,calc(100%-48px))] overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#1e1e1e] shadow-[0_0_0_1px_rgba(0,0,0,0.75),0_18px_54px_rgba(0,0,0,0.57)]"
       >
         <aside className="w-[210px] border-r border-white/[0.04] bg-[#141517] p-4 text-[13px]">
           <div className="mb-3 text-[11px] font-[700] uppercase tracking-wide text-[#8a8a8a]">System Settings</div>

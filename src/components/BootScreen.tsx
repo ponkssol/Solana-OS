@@ -47,7 +47,7 @@ export const BootScreen: React.FC = () => {
 
   return (
     <div
-      className="relative flex h-screen w-screen cursor-pointer select-none flex-col items-center justify-center overflow-hidden bg-black"
+      className="relative flex h-full w-full cursor-pointer select-none flex-col items-center justify-center overflow-hidden bg-black"
       style={{ background: '#000000' }}
       onClick={advanceToLockScreen}
     >

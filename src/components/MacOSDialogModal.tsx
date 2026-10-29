@@ -9,7 +9,7 @@ export function MacOSDialogModal({
 }) {
   return (
     <section
-      className="absolute bottom-[72px] right-4 z-40 flex h-[216px] w-[260px] flex-col rounded-[16px] border border-white/[0.07] px-4 pt-5 shadow-[0_0_0_1px_rgba(0,0,0,0.75),0_18px_54px_rgba(0,0,0,0.57)]"
+      className="absolute bottom-[72px] right-4 z-40 flex h-[216px] w-[min(260px,calc(100%-2rem))] flex-col rounded-[16px] border border-white/[0.07] px-4 pt-5 shadow-[0_0_0_1px_rgba(0,0,0,0.75),0_18px_54px_rgba(0,0,0,0.57)]"
       style={{ background: 'rgba(30,30,30,0.85)', backdropFilter: 'blur(40px)' }}
     >
       <div className="px-[6px] text-center">

@@ -64,6 +64,19 @@ export async function ipcSwitchRoom(room: RoomId): Promise<VaultStatusPayload> {
   return { ...fallbackState };
 }
 
+export type ShellPresentation = 'os' | 'windows';
+
+export async function ipcSetShellPresentation(mode: ShellPresentation): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke('set_shell_presentation', { mode });
+}
+
+export async function ipcGetShellPresentation(): Promise<ShellPresentation> {
+  if (!isTauriRuntime()) return 'os';
+  const mode = await invoke<string>('get_shell_presentation');
+  return mode === 'windows' ? 'windows' : 'os';
+}
+
 export async function ipcGetVaultStatus(): Promise<VaultStatusPayload> {
   if (isTauriRuntime()) {
     return await invoke<VaultStatusPayload>('get_vault_status');

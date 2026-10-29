@@ -34,6 +34,7 @@ export const WindowManager: React.FC = () => {
     toggleMaximizeWindow,
     focusWindow,
     updateWindowPosition,
+    updateWindowFrame,
     toggleWindowFreeze,
     shellView,
     roomFilter,
@@ -57,17 +58,47 @@ export const WindowManager: React.FC = () => {
   const [validatorOn, setValidatorOn] = useState(true);
   const [notice, setNotice] = useState('');
   const dragOffset = useRef({ x: 0, y: 0 });
+  const dragged = useRef<Set<WindowId>>(new Set());
 
   useEffect(() => {
     void getEnclaveStatus().then((status) => setRows(status.sandboxes));
   }, []);
 
+  useEffect(() => {
+    const fit = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const { windows: openWindows } = useOSStore.getState();
+      for (const win of openWindows) {
+        if (win.isMaximized) continue;
+        const frame = dragged.current.has(win.id) || win.id !== 'app-cloner'
+          ? clampFrame(win.position.x, win.position.y, win.size.width, win.size.height, vw, vh)
+          : preferredClonerFrame(vw, vh);
+        if (
+          frame.x !== win.position.x ||
+          frame.y !== win.position.y ||
+          frame.width !== win.size.width ||
+          frame.height !== win.size.height
+        ) {
+          updateWindowFrame(win.id, frame);
+        }
+      }
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [updateWindowFrame]);
+
   const onMove = (event: React.MouseEvent) => {
     if (!draggingId) return;
+    const win = useOSStore.getState().windows.find((item) => item.id === draggingId);
+    const width = win?.size.width ?? 280;
+    const nextX = event.clientX - dragOffset.current.x;
+    const nextY = event.clientY - dragOffset.current.y;
     updateWindowPosition(
       draggingId,
-      Math.max(8, event.clientX - dragOffset.current.x),
-      Math.max(40, event.clientY - dragOffset.current.y),
+      Math.min(Math.max(8, nextX), Math.max(8, window.innerWidth - Math.min(width, window.innerWidth - 16))),
+      Math.min(Math.max(36, nextY), Math.max(36, window.innerHeight - 80)),
     );
   };
 
@@ -101,6 +132,7 @@ export const WindowManager: React.FC = () => {
           win={win}
           onDragStart={(event) => {
             focusWindow(win.id);
+            dragged.current.add(win.id);
             setDraggingId(win.id);
             dragOffset.current = { x: event.clientX - win.position.x, y: event.clientY - win.position.y };
           }}
@@ -149,7 +181,7 @@ export const WindowManager: React.FC = () => {
         </WindowFrame>
       ))}
       {walletBrand && (
-        <section className="absolute right-8 top-[120px] z-30 h-[360px] w-[320px] overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#1e1e1e] shadow-[0_0_0_1px_rgba(0,0,0,0.75),0_18px_40px_rgba(0,0,0,0.5)]">
+        <section className="absolute right-4 top-[88px] z-30 h-[min(360px,calc(100%-150px))] w-[min(320px,calc(100%-2rem))] overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#1e1e1e] shadow-[0_0_0_1px_rgba(0,0,0,0.75),0_18px_40px_rgba(0,0,0,0.5)]">
           <WalletPanel brand={walletBrand} onClose={() => setWalletBrand(null)} />
         </section>
       )}
@@ -185,6 +217,26 @@ export const WindowManager: React.FC = () => {
   }
 };
 
+function preferredClonerFrame(vw: number, vh: number) {
+  const top = 40;
+  const bottom = 84;
+  const reserve = Math.min(372, Math.max(0, vw - 760));
+  const width = Math.round(Math.max(520, Math.min(vw - 32 - reserve, vw * 0.66)));
+  const height = Math.round(Math.max(380, Math.min(vh - top - bottom, vh * 0.74)));
+  return clampFrame(20, top, width, height, vw, vh);
+}
+
+function clampFrame(x: number, y: number, width: number, height: number, vw: number, vh: number) {
+  const nextWidth = Math.min(width, Math.max(320, vw - 16));
+  const nextHeight = Math.min(height, Math.max(240, vh - 48));
+  return {
+    x: Math.min(Math.max(8, x), Math.max(8, vw - nextWidth - 8)),
+    y: Math.min(Math.max(32, y), Math.max(32, vh - nextHeight - 8)),
+    width: nextWidth,
+    height: nextHeight,
+  };
+}
+
 function WindowFrame({
   win,
   children,
@@ -207,7 +259,7 @@ function WindowFrame({
   activeItem: string;
 }) {
   const style: React.CSSProperties = win.isMaximized
-    ? { top: 40, left: 16, width: 'calc(100vw - 32px)', height: 'calc(100vh - 120px)', zIndex: win.zIndex }
+    ? { top: 36, left: 16, right: 16, bottom: 76, zIndex: win.zIndex }
     : { top: win.position.y, left: win.position.x, width: win.size.width, height: win.size.height, zIndex: win.zIndex };
 
   return (

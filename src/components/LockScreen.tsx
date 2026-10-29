@@ -17,7 +17,7 @@ export const LockScreen: React.FC = () => {
   };
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden text-white select-none">
+    <div className="relative h-full w-full overflow-hidden text-white select-none">
       <img src={WALLPAPER} alt="" className="absolute inset-0 size-full scale-110 object-cover blur-[28px]" />
       <div className="absolute inset-0 bg-black/25" />
 
