@@ -95,7 +95,9 @@ jobs:
           prerelease: true
           draft: false
           make_latest: false
-          generate_release_notes: true
+          body: |
+            Solana OS v${{ steps.version.outputs.version }} prerelease for Windows x64.
+            Install with the NSIS setup .exe, or use the .msi for managed deployment.
           files: out/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
