@@ -76,3 +76,27 @@ export function toBase64(bytes: Uint8Array): string {
   for (const b of bytes) binary += String.fromCharCode(b);
   return btoa(binary);
 }
+
+export function fromBase64(text: string): Uint8Array {
+  return Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
+}
+
+function readCompactU16(bytes: Uint8Array, offset: number): [number, number] {
+  let value = 0;
+  for (let i = 0; i < 3; i++) {
+    const byte = bytes[offset + i];
+    value |= (byte & 0x7f) << (7 * i);
+    if ((byte & 0x80) === 0) return [value, offset + i + 1];
+  }
+  throw new Error('Malformed compact-u16');
+}
+
+/** Fee payer of a signed legacy or v0 wire transaction. */
+export function feePayerOf(tx: Uint8Array): string {
+  const [sigCount, afterSigs] = readCompactU16(tx, 0);
+  let offset = afterSigs + sigCount * 64;
+  if (tx[offset] & 0x80) offset += 1;
+  const [, keysAt] = readCompactU16(tx, offset + 3);
+  if (keysAt + 32 > tx.length) throw new Error('Transaction is too short');
+  return base58Encode(tx.slice(keysAt, keysAt + 32));
+}

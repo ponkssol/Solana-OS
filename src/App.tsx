@@ -12,6 +12,10 @@ import { usePrefs, wallpaperCss } from './lib/settings';
 import { useIdleGuards } from './lib/useIdleGuards';
 import { SystemSettingsModal } from './components/SystemSettingsModal';
 import { ShieldReview } from './components/ShieldReview';
+import { invoke } from '@tauri-apps/api/core';
+import { isTauriRuntime } from './lib/tauriIpc';
+import { listen } from '@tauri-apps/api/event';
+import { queueExternal, type ExternalTx } from './lib/wallet';
 import { UpdatePrompt } from './components/UpdatePrompt';
 
 export const App: React.FC = () => {
@@ -32,6 +36,19 @@ export const App: React.FC = () => {
   useEffect(() => {
     syncVaultStatus();
   }, [syncVaultStatus]);
+
+  const rpcUrl = usePrefs((s) => s.rpcUrl);
+  useEffect(() => {
+    if (isTauriRuntime()) void invoke('shield_proxy_set_upstream', { url: rpcUrl }).catch(() => undefined);
+  }, [rpcUrl]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    const off = listen<ExternalTx>('shield://external-tx', (e) => queueExternal(e.payload));
+    return () => {
+      void off.then((fn) => fn());
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

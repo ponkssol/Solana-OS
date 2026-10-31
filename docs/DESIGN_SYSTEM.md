@@ -82,4 +82,4 @@ Buttons and selects use `--os-control-height` (26px), inside the 24–28px range
 
 ## Installers
 
-The Windows installer workflow publishes a pre-release tagged `v<version>` from `tauri.conf.json`, currently `v1.0.0-alpha.5`, with `Solana-OS_<version>_x64-setup.exe` (NSIS) and `Solana-OS_<version>_x64_en-US.msi` (WiX). Earlier tags are left as they were. When the `TAURI_SIGNING_PRIVATE_KEY` secret is set, the run also signs the NSIS installer for the updater and refreshes `latest.json` on the `updater` release.
+The Windows installer workflow publishes a pre-release tagged `v<version>` from `tauri.conf.json`, currently `v1.0.0-alpha.6`, with `Solana-OS_<version>_x64-setup.exe` (NSIS) and `Solana-OS_<version>_x64_en-US.msi` (WiX). Earlier tags are left as they were. When the `TAURI_SIGNING_PRIVATE_KEY` secret is set, the run also signs the NSIS installer for the updater and refreshes `latest.json` on the `updater` release.

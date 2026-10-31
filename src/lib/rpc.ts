@@ -64,3 +64,48 @@ export async function simulateWithAccounts(url: string, base64Tx: string, addres
 export async function sendRawTransaction(url: string, base64Tx: string): Promise<string> {
   return await rpc<string>(url, 'sendTransaction', [base64Tx, { encoding: 'base64', preflightCommitment: 'confirmed' }]);
 }
+
+export interface TokenBalance {
+  mint: string;
+  amount: string;
+  decimals: number;
+  program: 'token' | 'token-2022';
+}
+
+const TOKEN_PROGRAMS = {
+  token: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+  'token-2022': 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+} as const;
+
+interface ParsedTokenAccount {
+  account: { data: { parsed: { info: { mint: string; tokenAmount: { uiAmountString: string; decimals: number } } } } };
+}
+
+export async function getTokenBalances(url: string, owner: string): Promise<TokenBalance[]> {
+  const lists = await Promise.all(
+    (Object.keys(TOKEN_PROGRAMS) as (keyof typeof TOKEN_PROGRAMS)[]).map(async (program) => {
+      const result = await rpc<{ value: ParsedTokenAccount[] }>(url, 'getTokenAccountsByOwner', [
+        owner,
+        { programId: TOKEN_PROGRAMS[program] },
+        { encoding: 'jsonParsed', commitment: 'confirmed' },
+      ]);
+      return result.value.map(({ account }) => {
+        const info = account.data.parsed.info;
+        return { mint: info.mint, amount: info.tokenAmount.uiAmountString, decimals: info.tokenAmount.decimals, program };
+      });
+    }),
+  );
+  return lists.flat().filter((t) => Number(t.amount) > 0);
+}
+
+export interface SignatureInfo {
+  signature: string;
+  slot: number;
+  blockTime: number | null;
+  err: unknown;
+  memo: string | null;
+}
+
+export async function getRecentSignatures(url: string, address: string, limit = 15): Promise<SignatureInfo[]> {
+  return await rpc<SignatureInfo[]>(url, 'getSignaturesForAddress', [address, { limit, commitment: 'confirmed' }]);
+}

@@ -1,8 +1,18 @@
 import { useEffect, useState } from 'react';
 import { usePrefs } from '../lib/settings';
-import { getLatestBlockhash, getSolBalance, sendRawTransaction } from '../lib/rpc';
+import {
+  getLatestBlockhash,
+  getRecentSignatures,
+  getSolBalance,
+  getTokenBalances,
+  sendRawTransaction,
+  type SignatureInfo,
+  type TokenBalance,
+} from '../lib/rpc';
 import { LAMPORTS_PER_SOL, buildTransferMessage, decodePublicKey, toBase64, wrapTransaction } from '../lib/solanaTx';
-import { requestSignature, useWallet } from '../lib/wallet';
+import { addAccount, assignRoom, renameAccount, requestSignature, selectAccount, useWallet } from '../lib/wallet';
+import { ROOM_CONFIGS } from '../tokens/designTokens';
+import { useOSStore } from '../store/useOSStore';
 import type { EnclaveSnapshot } from '../lib/tauriBridge';
 
 const BTN = 'h-[28px] rounded-[6px] border border-white/[0.06] bg-white/[0.05] px-3 text-[13px] font-[510]';
@@ -61,14 +71,14 @@ export function ShieldPanel({ active }: { active: boolean }) {
       <h2 className="text-[15px] font-[700]">Anti-Drainer Shield</h2>
       <Spec label="Status" value={active ? 'On' : 'Off'} />
       <p className="text-[12px] leading-5 text-[#8a8a8a]">
-        Every signature the vault wallet produces is reviewed here first: transactions are simulated against your RPC endpoint and checked by the local drainer rules, then you approve or reject. Apps running in a room keep their own wallets and do not route through Shield.
+        Every signature the vault wallet produces is reviewed here first: transactions are simulated against your RPC endpoint and checked by the local drainer rules, then you approve or reject. Apps launched in a room get a loopback RPC in SOLANA_RPC_URL (also ANCHOR_PROVIDER_URL), so the Solana CLI, Anchor, scripts and any wallet pointed at that URL have their sendTransaction calls held here for review. Browser extension wallets such as Phantom use their own RPC and signer, so their transactions are not intercepted.
       </p>
       {history.length === 0 ? (
         <EmptyState text="No signing requests yet." />
       ) : (
         <div className="flex flex-col gap-2">
           {history.map((d) => (
-            <div key={d.id} className="flex items-center justify-between rounded-[8px] border border-white/[0.06] bg-white/[0.03] px-3 py-2">
+            <div key={`${d.id}-${d.at}`} className="flex items-center justify-between rounded-[8px] border border-white/[0.06] bg-white/[0.03] px-3 py-2">
               <span className="truncate">{d.summary}</span>
               <span className={d.approved ? 'text-[#30d158]' : 'text-[#ff6961]'}>
                 {d.approved ? 'Signed' : 'Rejected'} · {new Date(d.at).toLocaleTimeString()}
@@ -100,6 +110,10 @@ export function WalletPanel({
   brand: 'phantom' | 'solflare' | 'backpack';
   onClose: () => void;
 }) {
+  const activeRoom = useOSStore((s) => s.activeRoom);
+  useEffect(() => {
+    selectAccount(useWallet.getState().rooms[activeRoom] ?? 0);
+  }, [activeRoom]);
   const title = brand === 'solflare' ? 'Solflare' : brand === 'backpack' ? 'Backpack' : 'Phantom';
   return (
     <div className="flex h-full min-w-0 flex-col gap-4 overflow-y-auto px-8 py-6 text-[13px]">
@@ -131,42 +145,105 @@ function Spec({ label, value }: { label: string; value: string }) {
 
 function WalletBalance() {
   const rpcUrl = usePrefs((p) => p.rpcUrl);
-  const address = useWallet((s) => s.address);
-  const [state, setState] = useState<{ sol?: number; error?: string }>({});
+  const accounts = useWallet((s) => s.accounts);
+  const selected = useWallet((s) => s.selected);
+  const rooms = useWallet((s) => s.rooms);
+  const account = accounts.find((a) => a.index === selected) ?? accounts[0];
+  const address = account?.address;
+  const [state, setState] = useState<{ sol?: number; tokens?: TokenBalance[]; history?: SignatureInfo[]; error?: string }>({});
   const [refresh, setRefresh] = useState(0);
+  const [name, setName] = useState('');
+
+  useEffect(() => setName(account?.name ?? ''), [account?.name]);
 
   useEffect(() => {
     if (!address) return;
     let live = true;
     setState({});
-    getSolBalance(rpcUrl, address)
-      .then((sol) => live && setState({ sol }))
-      .catch((err) => live && setState({ error: String(err) }));
+    Promise.all([getSolBalance(rpcUrl, address), getTokenBalances(rpcUrl, address), getRecentSignatures(rpcUrl, address)])
+      .then(([sol, tokens, history]) => live && setState({ sol, tokens, history }))
+      .catch((err) => live && setState({ error: String(err instanceof Error ? err.message : err) }));
     return () => {
       live = false;
     };
   }, [rpcUrl, address, refresh]);
 
-  if (!address) {
+  if (!account || !address) {
     return <EmptyState text="Unlock a vault created from a recovery phrase to load its wallet." />;
   }
   return (
     <div className="flex flex-col gap-3">
-      <Spec label="Address (m/44'/501'/0'/0')" value={address} />
-      <Spec
-        label="Balance"
-        value={state.error ? `Couldn't load: ${state.error}` : state.sol === undefined ? 'Loading…' : `${state.sol.toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL`}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={account.index} onChange={(e) => selectAccount(Number(e.target.value))} className={FIELD}>
+          {accounts.map((a) => (
+            <option key={a.index} value={a.index}>{a.name}</option>
+          ))}
+        </select>
+        <input value={name} onChange={(e) => setName(e.target.value)} onBlur={() => renameAccount(account.index, name)} className={`${FIELD} w-[160px]`} aria-label="Account name" />
+        <button type="button" className={BTN} onClick={() => void addAccount()}>Add account</button>
+        <button type="button" className={BTN} onClick={() => setRefresh((n) => n + 1)}>Refresh</button>
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-3">
+        <Spec label={`Address (m/44'/501'/${account.index}'/0')`} value={address} />
+        <Spec
+          label="Balance"
+          value={state.error ? `Couldn't load: ${state.error}` : state.sol === undefined ? 'Loading…' : `${state.sol.toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL`}
+        />
+      </div>
+      <div className="rounded-[10px] border border-white/[0.06] bg-white/[0.03] p-3">
+        <div className="mb-2 text-[11px] font-[700] text-[#8a8a8a]">Rooms using this account</div>
+        <div className="flex flex-wrap gap-3">
+          {Object.values(ROOM_CONFIGS).map((room) => (
+            <label key={room.id} className="flex items-center gap-1.5 text-[12px]">
+              <input type="radio" checked={(rooms[room.id] ?? 0) === account.index} onChange={() => assignRoom(room.id, account.index)} />
+              {room.label}
+            </label>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-[10px] border border-white/[0.06] bg-white/[0.03] p-3">
+        <div className="mb-2 text-[11px] font-[700] text-[#8a8a8a]">Tokens</div>
+        {!state.tokens ? (
+          <div className="text-[12px] text-[#8a8a8a]">{state.error ? 'Unavailable.' : 'Loading…'}</div>
+        ) : state.tokens.length === 0 ? (
+          <div className="text-[12px] text-[#8a8a8a]">No SPL token balances.</div>
+        ) : (
+          state.tokens.map((t) => (
+            <div key={`${t.program}-${t.mint}`} className="flex justify-between gap-3 py-1 text-[12px]">
+              <span className="min-w-0 truncate font-mono" title={t.mint}>{t.mint}</span>
+              <span className="shrink-0">{t.amount}{t.program === 'token-2022' ? ' · 2022' : ''}</span>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="rounded-[10px] border border-white/[0.06] bg-white/[0.03] p-3">
+        <div className="mb-2 text-[11px] font-[700] text-[#8a8a8a]">Recent transactions</div>
+        {!state.history ? (
+          <div className="text-[12px] text-[#8a8a8a]">{state.error ? 'Unavailable.' : 'Loading…'}</div>
+        ) : state.history.length === 0 ? (
+          <div className="text-[12px] text-[#8a8a8a]">No transactions yet.</div>
+        ) : (
+          state.history.map((h) => (
+            <div key={h.signature} className="flex justify-between gap-3 py-1 text-[12px]">
+              <span className="min-w-0 truncate font-mono" title={h.signature}>{h.signature}</span>
+              <span className={`shrink-0 ${h.err ? 'text-[#ff6961]' : 'text-[#8a8a8a]'}`}>
+                {h.err ? 'Failed · ' : ''}
+                {h.blockTime ? new Date(h.blockTime * 1000).toLocaleString() : `slot ${h.slot}`}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
       <div className="text-[11px] text-[#8a8a8a]">Endpoint: {rpcUrl}</div>
-      <SendSol from={address} onSent={() => setRefresh((n) => n + 1)} />
-      <SignMessage />
+      <SendSol from={address} account={account.index} onSent={() => setRefresh((n) => n + 1)} />
+      <SignMessage account={account.index} />
     </div>
   );
 }
 
 const FIELD = 'h-[30px] rounded-[6px] border border-white/[0.08] bg-white/[0.04] px-2 text-[12px] outline-none';
 
-function SendSol({ from, onSent }: { from: string; onSent: () => void }) {
+function SendSol({ from, account, onSent }: { from: string; account: number; onSent: () => void }) {
   const rpcUrl = usePrefs((p) => p.rpcUrl);
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
@@ -186,6 +263,7 @@ function SendSol({ from, onSent }: { from: string; onSent: () => void }) {
         origin: 'Solana OS Wallet',
         summary: `Send ${amount} SOL to ${to.trim()}`,
         bytes: message,
+        account,
         unsignedTx: wrapTransaction(message),
         transfer: { destination: to.trim(), lamports },
       });
@@ -211,7 +289,7 @@ function SendSol({ from, onSent }: { from: string; onSent: () => void }) {
   );
 }
 
-function SignMessage() {
+function SignMessage({ account }: { account: number }) {
   const [text, setText] = useState('');
   const [status, setStatus] = useState('');
 
@@ -223,6 +301,7 @@ function SignMessage() {
         origin: 'Solana OS Wallet',
         summary: 'Sign a text message',
         bytes: new TextEncoder().encode(text),
+        account,
       });
       setStatus(`Signature: ${toBase64(signature)}`);
     } catch (err) {

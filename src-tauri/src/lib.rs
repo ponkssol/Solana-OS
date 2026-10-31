@@ -9,6 +9,7 @@ pub mod sandbox;
 pub mod security;
 mod shell_mode;
 mod vault_file;
+mod shield_proxy;
 mod wallet;
 
 use serde::{Deserialize, Serialize};
@@ -579,6 +580,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(initial_state)
         .invoke_handler(tauri::generate_handler![
+            shield_proxy::shield_proxy_set_upstream,
+            shield_proxy::shield_proxy_url,
+            shield_proxy::shield_proxy_decide,
+            wallet::wallet_accounts,
             unlock_vault_solos,
             lock_vault_solos,
             seal_vault_solos,
@@ -639,6 +644,7 @@ pub fn run() {
             diag::init(app.handle());
             shell_mode::install(app.handle());
             containment::install(app.handle());
+            shield_proxy::install(app.handle());
             diag!("setup finished");
             Ok(())
         })

@@ -14,16 +14,16 @@ use zeroize::Zeroizing;
 type HmacSha512 = Hmac<Sha512>;
 
 pub const DERIVATION_PATH: &str = "m/44'/501'/0'/0'";
-const PATH: [u32; 4] = [44, 501, 0, 0];
 const HARDENED: u32 = 0x8000_0000;
+pub const MAX_ACCOUNTS: u32 = 32;
 
-static SESSION: Mutex<Option<SigningKey>> = Mutex::new(None);
+static SESSION: Mutex<Option<Zeroizing<[u8; 64]>>> = Mutex::new(None);
 static PENDING: Mutex<Option<PendingQueue>> = Mutex::new(None);
 
 #[derive(Default)]
 struct PendingQueue {
     next_id: u64,
-    requests: HashMap<u64, Vec<u8>>,
+    requests: HashMap<u64, (u32, Vec<u8>)>,
 }
 
 fn normalize(phrase: &str) -> String {
@@ -47,11 +47,16 @@ fn hmac512(key: &[u8], parts: &[&[u8]]) -> Zeroizing<[u8; 64]> {
     out
 }
 
-// SLIP-0010 for ed25519 only defines hardened children, which is what Phantom uses.
-pub fn derive_signing_key(phrase: &str) -> SigningKey {
-    let seed = bip39_seed(phrase);
+#[cfg(test)]
+fn derive_signing_key(phrase: &str) -> SigningKey {
+    derive_account(&bip39_seed(phrase), 0)
+}
+
+// SLIP-0010 for ed25519 only defines hardened children, which is what Phantom uses
+// for its m/44'/501'/N'/0' accounts.
+pub fn derive_account(seed: &[u8; 64], account: u32) -> SigningKey {
     let mut node = hmac512(b"ed25519 seed", &[seed.as_ref()]);
-    for index in PATH {
+    for index in [44, 501, account, 0] {
         let (key, chain) = node.split_at(32);
         let child = (index | HARDENED).to_be_bytes();
         node = hmac512(chain, &[&[0u8], key, &child]);
@@ -74,9 +79,9 @@ pub fn start_session(phrase: &str) -> Result<String, String> {
     if !looks_like_phrase(phrase) {
         return Err("The vault does not contain a recovery phrase.".into());
     }
-    let key = derive_signing_key(phrase);
-    let address = address_of(&key);
-    *SESSION.lock().map_err(|_| "wallet session poisoned")? = Some(key);
+    let seed = bip39_seed(phrase);
+    let address = address_of(&derive_account(&seed, 0));
+    *SESSION.lock().map_err(|_| "wallet session poisoned")? = Some(seed);
     Ok(address)
 }
 
@@ -90,10 +95,17 @@ pub struct WalletInfo {
 #[tauri::command]
 pub fn wallet_info() -> Option<WalletInfo> {
     let guard = SESSION.lock().ok()?;
-    guard.as_ref().map(|key| WalletInfo {
-        address: address_of(key),
+    guard.as_ref().map(|seed| WalletInfo {
+        address: address_of(&derive_account(seed, 0)),
         derivation_path: DERIVATION_PATH,
     })
+}
+
+#[tauri::command]
+pub fn wallet_accounts(count: u32) -> Result<Vec<String>, String> {
+    let guard = SESSION.lock().map_err(|_| "wallet session poisoned")?;
+    let seed = guard.as_ref().ok_or("Unlock the vault first.")?;
+    Ok((0..count.clamp(1, MAX_ACCOUNTS)).map(|i| address_of(&derive_account(seed, i))).collect())
 }
 
 #[tauri::command]
@@ -107,7 +119,11 @@ pub fn wallet_lock() {
 }
 
 #[tauri::command]
-pub fn shield_queue_sign(message: Vec<u8>) -> Result<u64, String> {
+pub fn shield_queue_sign(message: Vec<u8>, account: Option<u32>) -> Result<u64, String> {
+    let account = account.unwrap_or(0);
+    if account >= MAX_ACCOUNTS {
+        return Err("Unknown wallet account.".into());
+    }
     if SESSION.lock().map_err(|_| "wallet session poisoned")?.is_none() {
         return Err("Unlock the vault before signing.".into());
     }
@@ -115,7 +131,7 @@ pub fn shield_queue_sign(message: Vec<u8>) -> Result<u64, String> {
     let queue = guard.get_or_insert_with(PendingQueue::default);
     queue.next_id += 1;
     let id = queue.next_id;
-    queue.requests.insert(id, message);
+    queue.requests.insert(id, (account, message));
     Ok(id)
 }
 
@@ -130,15 +146,15 @@ pub fn shield_reject_sign(id: u64) {
 
 #[tauri::command]
 pub fn shield_approve_sign(id: u64) -> Result<Vec<u8>, String> {
-    let message = PENDING
+    let (account, message) = PENDING
         .lock()
         .map_err(|_| "sign queue poisoned")?
         .as_mut()
         .and_then(|queue| queue.requests.remove(&id))
         .ok_or("This signing request is no longer pending.")?;
     let guard = SESSION.lock().map_err(|_| "wallet session poisoned")?;
-    let key = guard.as_ref().ok_or("Unlock the vault before signing.")?;
-    Ok(key.sign(&message).to_bytes().to_vec())
+    let seed = guard.as_ref().ok_or("Unlock the vault before signing.")?;
+    Ok(derive_account(seed, account).sign(&message).to_bytes().to_vec())
 }
 
 #[cfg(test)]
@@ -166,12 +182,18 @@ mod tests {
     fn signing_requires_a_queued_request() {
         start_session(PHRASE).unwrap();
         assert!(shield_approve_sign(999).is_err());
-        let id = shield_queue_sign(b"hello".to_vec()).unwrap();
+        let id = shield_queue_sign(b"hello".to_vec(), None).unwrap();
         let sig = shield_approve_sign(id).unwrap();
         let key = derive_signing_key(PHRASE);
         let sig = ed25519_dalek::Signature::from_slice(&sig).unwrap();
         assert!(key.verifying_key().verify(b"hello", &sig).is_ok());
         assert!(shield_approve_sign(id).is_err());
         wallet_lock();
+    }
+
+    #[test]
+    fn second_account_matches_phantom() {
+        let seed = bip39_seed(PHRASE);
+        assert_ne!(address_of(&derive_account(&seed, 1)), address_of(&derive_account(&seed, 0)));
     }
 }

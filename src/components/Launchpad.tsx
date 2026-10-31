@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getEnclaveStatus, type InstalledApp, type SandboxInstance } from '../lib/tauriBridge';
 import { ipcContainmentFocus } from '../lib/tauriIpc';
 import { useOSStore } from '../store/useOSStore';
@@ -134,7 +134,7 @@ export function Launchpad() {
       </div>
 
       {tab !== 'apps' ? (
-        <div className="mt-8 w-full max-w-[95vw] flex-1 overflow-y-auto px-6 pb-[110px]">
+        <div className="mt-8 flex min-h-0 w-full max-w-[95vw] flex-1 flex-col px-6 pb-[96px]">
           {sandboxError && <Status text={`Couldn't read running apps: ${sandboxError}`} />}
           {!sandboxError && sandboxes === null && <Status text="Loading…" />}
           {!sandboxError && sandboxes !== null && instances.length === 0 && (
@@ -146,8 +146,8 @@ export function Launchpad() {
               }
             />
           )}
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-x-4 gap-y-7">
-            {instances.map((item) => (
+          <Paged items={instances} resetKey={`${tab}|${query}`}>
+            {(item) => (
               <button
                 key={item.instanceId}
                 type="button"
@@ -166,11 +166,11 @@ export function Launchpad() {
                 </span>
                 <span className="-mt-1 text-[11px] text-white/55">{item.status === 'Frozen' ? 'Frozen' : `PID ${item.pid}`}</span>
               </button>
-            ))}
-          </div>
+            )}
+          </Paged>
         </div>
       ) : (
-      <div className="mt-8 w-full max-w-[95vw] flex-1 overflow-y-auto px-6 pb-[110px]">
+      <div className="mt-8 flex min-h-0 w-full max-w-[95vw] flex-1 flex-col px-6 pb-[96px]">
         {appsState === 'loading' && installedApps.length === 0 && <Status text="Finding installed apps…" />}
         {appsState === 'error' && (
           <Status text={`Couldn't read installed apps: ${appsError}`}>
@@ -189,8 +189,8 @@ export function Launchpad() {
         {appsState === 'ready' && apps.length === 0 && (
           <Status text={query ? `No apps match “${query}”.` : 'No installed apps were found in the Start Menu.'} />
         )}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-x-4 gap-y-7">
-          {apps.map((app) => (
+        <Paged items={apps} resetKey={query}>
+          {(app) => (
             <button
               key={`${app.path}|${app.name}`}
               type="button"
@@ -213,8 +213,8 @@ export function Launchpad() {
                 {app.name}
               </span>
             </button>
-          ))}
-        </div>
+          )}
+        </Paged>
       </div>
       )}
 
@@ -251,6 +251,102 @@ function Status({ text, children }: { text: string; children?: ReactNode }) {
     <div className="flex flex-col items-center py-16 text-center text-[13px] text-white/70">
       {text}
       {children}
+    </div>
+  );
+}
+
+const TILE_W = 130;
+const TILE_H = 118;
+const GAP_X = 16;
+const GAP_Y = 28;
+
+// Pages are sized from the measured area so a page never needs vertical scrolling.
+function Paged<T>({ items, resetKey, children }: { items: T[]; resetKey: string; children: (item: T) => ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [perPage, setPerPage] = useState(24);
+  const [page, setPage] = useState(0);
+  const lastWheel = useRef(0);
+  const swipeStart = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const cols = Math.max(1, Math.floor((el.clientWidth + GAP_X) / (TILE_W + GAP_X)));
+      const rows = Math.max(1, Math.floor((el.clientHeight + GAP_Y) / (TILE_H + GAP_Y)));
+      setPerPage(cols * rows);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => setPage(0), [resetKey]);
+
+  const pages = Math.max(1, Math.ceil(items.length / perPage));
+  const current = Math.min(page, pages - 1);
+  const go = (delta: number) => setPage((p) => Math.max(0, Math.min(pages - 1, Math.min(p, pages - 1) + delta)));
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowRight') go(1);
+      if (event.key === 'ArrowLeft') go(-1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div
+        ref={ref}
+        className="relative min-h-0 flex-1 overflow-hidden"
+        onWheel={(event) => {
+          const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+          const now = Date.now();
+          if (Math.abs(delta) < 8 || now - lastWheel.current < 450) return;
+          lastWheel.current = now;
+          go(delta > 0 ? 1 : -1);
+        }}
+        onPointerDown={(event) => {
+          swipeStart.current = event.clientX;
+        }}
+        onPointerUp={(event) => {
+          if (swipeStart.current === null) return;
+          const dx = event.clientX - swipeStart.current;
+          swipeStart.current = null;
+          if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
+        }}
+      >
+        <div
+          className="flex h-full transition-transform duration-300 ease-out"
+          style={{ transform: `translateX(-${current * 100}%)` }}
+        >
+          {Array.from({ length: pages }, (_, index) => (
+            <div
+              key={index}
+              className="grid h-full w-full shrink-0 content-start grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-x-4 gap-y-7"
+              aria-hidden={index !== current}
+            >
+              {items.slice(index * perPage, (index + 1) * perPage).map(children)}
+            </div>
+          ))}
+        </div>
+      </div>
+      {pages > 1 && (
+        <div className="mt-4 flex justify-center gap-2" onClick={(event) => event.stopPropagation()}>
+          {Array.from({ length: pages }, (_, index) => (
+            <button
+              key={index}
+              type="button"
+              aria-label={`Page ${index + 1}`}
+              onClick={() => setPage(index)}
+              className={`h-[7px] w-[7px] rounded-full transition-colors ${index === current ? 'bg-white' : 'bg-white/35 hover:bg-white/60'}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

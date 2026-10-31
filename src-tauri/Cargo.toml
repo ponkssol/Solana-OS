@@ -1,6 +1,6 @@
 [package]
 name = "solana-os"
-version = "1.0.0-alpha.5"
+version = "1.0.0-alpha.6"
 description = "Solana OS desktop shell with contained app rooms and vault.solos"
 authors = ["Solana OS Core Team"]
 edition = "2021"
@@ -31,6 +31,7 @@ ed25519-dalek = { version = "2", features = ["zeroize"] }
 hmac = "0.12"
 pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 bs58 = "0.5"
+ureq = { version = "2", default-features = false, features = ["tls"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

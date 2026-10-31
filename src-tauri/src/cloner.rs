@@ -501,6 +501,11 @@ impl UniversalAppCloner {
             user_profile.to_string_lossy().to_string(),
         );
         env_overrides.insert("SOLANA_OS_ROOM".to_string(), clean_room.clone());
+        if let Some(rpc) = crate::shield_proxy::url_for_room(&clean_room) {
+            for key in ["SOLANA_RPC_URL", "ANCHOR_PROVIDER_URL", "SOLANA_OS_SHIELD_RPC"] {
+                env_overrides.insert(key.to_string(), rpc.clone());
+            }
+        }
         env_overrides.insert("SOLANA_OS_APP_ID".to_string(), clean_app.clone());
         env_overrides.insert(
             "SOLANA_OS_REGISTRY_ROOT".to_string(),
