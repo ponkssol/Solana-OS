@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useOSStore, WindowId } from '../store/useOSStore';
 import { BentoControlCenter } from './BentoControlCenter';
 import { CONTROL_CENTER_ICON, WIFI_ICON } from './macosMaterials';
+import { ipcMinimizeShell } from '../lib/tauriIpc';
 
 const MENUS: { label: string; windowId?: WindowId; heavy?: boolean }[] = [
   { label: 'Solana OS', heavy: true },
@@ -98,6 +99,15 @@ export const TopMenuBar: React.FC = () => {
         </div>
         <button
           type="button"
+          onClick={() => void ipcMinimizeShell()}
+          aria-label="Minimize"
+          title="Minimize"
+          className="ml-[8px] flex size-[22px] items-center justify-center rounded-[6px] text-white/90 hover:bg-white/10"
+        >
+          <MinimizeIcon />
+        </button>
+        <button
+          type="button"
           onClick={() => void toggleShellMode()}
           aria-label={shellMode === 'os' ? 'Windows mode' : 'Fullscreen'}
           title={shellMode === 'os' ? 'Windows mode' : 'Fullscreen'}
@@ -109,6 +119,14 @@ export const TopMenuBar: React.FC = () => {
     </header>
   );
 };
+
+function MinimizeIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden>
+      <path d="M2.6 6.5h7.8" />
+    </svg>
+  );
+}
 
 function FullscreenIcon() {
   return (

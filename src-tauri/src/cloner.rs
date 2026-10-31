@@ -756,6 +756,7 @@ impl UniversalAppCloner {
         );
 
         let resume_res = crate::desktop::resume_suspended_thread(launched.thread);
+        crate::diag!("launch {instance_id} exe={exe_path} resume={resume_res:?}");
         unsafe {
             let _ = CloseHandle(launched.thread);
             if resume_res.is_err() {

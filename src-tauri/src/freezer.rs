@@ -100,6 +100,7 @@ pub fn freeze_instance(
         .instances
         .get_mut(instance_id)
         .ok_or_else(|| format!("App instance '{}' not found", instance_id))?;
+    crate::diag!("freeze {instance_id} pid={}", instance.pid);
 
     if instance.status == AppInstanceStatus::Stopped {
         return Err(format!(
