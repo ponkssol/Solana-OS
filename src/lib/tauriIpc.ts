@@ -71,6 +71,11 @@ export async function ipcSetShellPresentation(mode: ShellPresentation): Promise<
   await invoke('set_shell_presentation', { mode });
 }
 
+export async function ipcMinimizeShell(): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke('minimize_shell');
+}
+
 export interface ContainmentEvent {
   kind: 'appeared' | 'title' | 'destroyed' | 'exited';
   instanceId: string;

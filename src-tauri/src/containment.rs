@@ -380,6 +380,7 @@ mod win {
                 }
             }
         }
+        crate::diag!("enroll {instance_id} pid={pid} job={}", rec.handle_bits != 0);
         if let Ok(mut jobs) = JOBS.lock() {
             jobs.insert(instance_id.to_string(), rec);
         }
@@ -394,6 +395,7 @@ mod win {
             jobs.remove(instance_id).map(|job| (job.handle_bits, job.exited))
         };
         let live = matches!(job, Some((_, false)));
+        crate::diag!("release {instance_id} live={live}");
         if let Some((bits, _)) = job {
             if bits != 0 {
                 unsafe {
@@ -578,6 +580,13 @@ mod win {
             if !root.0.is_null() && root != hwnd {
                 return false;
             }
+            // The sweep walks every top-level window, including the hidden helper and
+            // not-yet-shown windows apps create at startup. Taking those reparents or
+            // re-shows windows the app still drives itself, which hangs the clone;
+            // EVENT_OBJECT_SHOW captures them once the app shows them.
+            if !IsWindowVisible(hwnd).as_bool() {
+                return false;
+            }
             if cloaked(hwnd) {
                 return false;
             }
@@ -599,6 +608,11 @@ mod win {
         }
         strip_taskbar(hwnd, shell);
         let title = window_title(hwnd);
+        crate::diag!(
+            "capture {instance_id} hwnd={:#x} class={class_name} {width}x{height} as {:?}",
+            hwnd_bits(hwnd),
+            class
+        );
         match class {
             CaptureClass::Transient => {
                 remember(
@@ -1120,6 +1134,7 @@ mod win {
     }
 
     fn mark_stopped(instance_id: &str) {
+        crate::diag!("instance exited {instance_id}");
         let app = {
             let guard = RUNTIME.lock().unwrap_or_else(|err| err.into_inner());
             guard.as_ref().map(|runtime| runtime.app.clone())

@@ -8,7 +8,7 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, HWND_NOTOPMOST, HWND_TOPMOST,
     SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, WINDOW_STYLE, WS_BORDER,
-    WS_CAPTION, WS_CLIPSIBLINGS, WS_DLGFRAME, WS_POPUP, WS_SYSMENU, WS_THICKFRAME, WS_VISIBLE,
+    WS_CAPTION, WS_CLIPSIBLINGS, WS_DLGFRAME, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME, WS_VISIBLE,
 };
 
 // 0 = fullscreen OS, 1 = windowed Windows mode.
@@ -69,9 +69,14 @@ pub fn install(app: &AppHandle) {
         }
     });
     let _ = window.show();
+    // The shell starts behind whatever launched it; until it holds the foreground,
+    // WebView2 swallows the first clicks on the lock screen.
+    let _ = window.set_focus();
+    crate::diag!("shell shown in {} mode", current().as_str());
 }
 
 pub fn apply(window: &WebviewWindow, mode: ShellMode) -> Result<(), String> {
+    crate::diag!("shell presentation -> {}", mode.as_str());
     MODE.store(mode as u8, Ordering::SeqCst);
     NUDGES.store(0, Ordering::SeqCst);
     // Leave the OS fullscreen flag off. On WebView2 that flag is cancelled by Esc,
@@ -105,8 +110,26 @@ pub fn get_shell_presentation() -> &'static str {
     current().as_str()
 }
 
+#[tauri::command]
+pub fn minimize_shell(app: AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "main window missing".to_string())?;
+    crate::diag!("shell minimize requested");
+    // A topmost window would stay above whatever the user switches to after restoring
+    // another app, so drop it here; maintain() puts it back once the shell is restored.
+    window.set_always_on_top(false).map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    Z_ORDER.store(0, Ordering::SeqCst);
+    window.minimize().map_err(|e| e.to_string())
+}
+
 pub fn maintain(window: &WebviewWindow) {
     if current() != ShellMode::Os {
+        return;
+    }
+    // Minimizing raises Resized/Moved too; placing the window then would restore it at once.
+    if window.is_minimized().unwrap_or(false) {
         return;
     }
     if let Ok(bounds) = monitor_bounds(window, true) {
@@ -193,7 +216,7 @@ fn hwnd_of(window: &WebviewWindow) -> Result<HWND, String> {
 fn popup_style(current: isize) -> isize {
     let style = WINDOW_STYLE(current as u32);
     let cleared = style & !(WS_CAPTION | WS_THICKFRAME | WS_BORDER | WS_DLGFRAME | WS_SYSMENU);
-    let next = cleared | WS_POPUP | WS_VISIBLE | WS_CLIPSIBLINGS;
+    let next = cleared | WS_POPUP | WS_VISIBLE | WS_CLIPSIBLINGS | WS_MINIMIZEBOX;
     next.0 as isize
 }
 

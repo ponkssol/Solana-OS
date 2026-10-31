@@ -1,5 +1,6 @@
 pub mod cloner;
 mod containment;
+pub mod diag;
 pub mod desktop;
 pub mod freezer;
 pub mod quantum_vault;
@@ -507,14 +508,18 @@ fn clone_app_instance(
     state: State<'_, EnclaveState>,
 ) -> Result<crate::cloner::ClonedAppInstance, String> {
     let mut cloner = state.cloner.lock().map_err(|_| "App Cloner mutex poisoned")?;
-    cloner.clone_and_launch(crate::cloner::CloneLaunchRequest {
-        app_id,
+    let result = cloner.clone_and_launch(crate::cloner::CloneLaunchRequest {
+        app_id: app_id.clone(),
         room_id,
         custom_exe_path: None,
         extra_args: None,
         launch_on_enclave_desktop: Some(false),
         instance_label: None,
-    })
+    });
+    if let Err(err) = &result {
+        diag!("clone {app_id} failed: {err}");
+    }
+    result
 }
 
 #[tauri::command]
@@ -621,13 +626,16 @@ pub fn run() {
             run_sandboxed_cli_command,
             shell_mode::set_shell_presentation,
             shell_mode::get_shell_presentation,
+            shell_mode::minimize_shell,
             containment::containment_set_slot,
             containment::containment_focus,
             containment::containment_close_window
         ])
         .setup(|app| {
+            diag::init(app.handle());
             shell_mode::install(app.handle());
             containment::install(app.handle());
+            diag!("setup finished");
             Ok(())
         })
         .run(tauri::generate_context!())
