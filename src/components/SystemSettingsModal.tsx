@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { check } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
+import { checkForUpdate } from './UpdatePrompt';
+import { useWallet } from '../lib/wallet';
 import { getVersion } from '@tauri-apps/api/app';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { exportVaultBackup, importVaultBackup, vaultFilePath } from '../lib/vaultBlob';
@@ -66,13 +66,14 @@ function General() {
       <SettingsRow label="Identity" value={vault.identity || 'Not unlocked'} />
       <SettingsRow label="Active room" value={ROOM_CONFIGS[activeRoom].label} />
       <SettingsRow label="Vault" value={vault.locked ? 'Locked' : `Unlocked · ${vault.cipherSuite}`} />
-      <SettingsRow label="Key isolation ID" value={vault.keyIsolationId} />
+      <SettingsRow label="Room namespace" value={vault.keyIsolationId} />
     </>
   );
 }
 
 function VaultBackup() {
   const [path, setPath] = useState('');
+  const { address, suite } = useWallet();
   const [importing, setImporting] = useState<string | null>(null);
   const [passphrase, setPassphrase] = useState('');
   const [status, setStatus] = useState('');
@@ -120,8 +121,10 @@ function VaultBackup() {
   return (
     <div className="flex flex-col gap-3">
       <SettingsRow label="Vault file" value={path || 'Unavailable outside the desktop app'} />
+      <SettingsRow label="Format" value={suite ?? 'Unlock to read'} />
+      <SettingsRow label="Wallet address" value={address ?? 'Unlock to derive'} />
       <p className="text-[12px] leading-5 text-[#8a8a8a]">
-        A backup is the same encrypted file, sealed with Argon2id and XChaCha20-Poly1305. Opening it needs the passphrase that was set when it was exported.
+        The wallet key is derived from the recovery phrase at m/44'/501'/0'/0', the same account Phantom shows first. The hybrid X25519 and ML-KEM-768 keys are stored in the same file, sealed by the passphrase, so the passphrase remains the root of trust. A backup is that encrypted file; opening it needs the passphrase that was set when it was exported.
       </p>
       <div className="flex gap-2">
         <button type="button" className="os-btn os-btn-primary" onClick={() => void exportBackup()}>Export backup…</button>
@@ -169,18 +172,18 @@ function Rooms() {
 }
 
 function RpcWallet() {
-  const { rpcUrl, walletAddress, update } = usePrefs();
+  const { rpcUrl, update } = usePrefs();
+  const address = useWallet((s) => s.address);
   const [url, setUrl] = useState(rpcUrl);
-  const [address, setAddress] = useState(walletAddress);
   const [status, setStatus] = useState('');
 
   const save = async () => {
     const trimmed = url.trim() || DEFAULT_RPC_URL;
-    update({ rpcUrl: trimmed, walletAddress: address.trim() });
-    if (!address.trim()) return setStatus('Saved.');
+    update({ rpcUrl: trimmed });
+    if (!address) return setStatus('Saved.');
     setStatus('Checking balance…');
     try {
-      setStatus(`Saved. Balance: ${(await getSolBalance(trimmed, address.trim())).toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL`);
+      setStatus(`Saved. Balance: ${(await getSolBalance(trimmed, address)).toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL`);
     } catch (err) {
       setStatus(`Saved, but the balance check failed: ${String(err)}`);
     }
@@ -192,10 +195,7 @@ function RpcWallet() {
         <span className="text-[#8a8a8a]">RPC endpoint</span>
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={DEFAULT_RPC_URL} className={FIELD} />
       </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-[#8a8a8a]">Wallet address (public key, read-only)</span>
-        <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Base58 address" className={`${FIELD} font-mono`} />
-      </label>
+      <SettingsRow label="Wallet address" value={address ?? 'Unlock the vault to load it'} />
       <p className="text-[12px] leading-5 text-[#8a8a8a]">
         The public mainnet endpoint is rate-limited. Use your own RPC URL for reliable balances and simulations.
       </p>
@@ -298,12 +298,8 @@ function Updates() {
     setBusy(true);
     setStatus('Checking…');
     try {
-      const update = await check();
-      if (!update) return setStatus('Solana OS is up to date.');
-      setStatus(`Downloading ${update.version}…`);
-      await update.downloadAndInstall();
-      setStatus('Installed. Restarting…');
-      await relaunch();
+      const update = await checkForUpdate();
+      setStatus(update ? `Version ${update.version} is available. Review its release notes in the update prompt.` : 'Solana OS is up to date.');
     } catch (err) {
       setStatus(`Update check failed: ${String(err)}`);
     } finally {

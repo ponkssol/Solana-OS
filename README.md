@@ -11,7 +11,7 @@
   <img alt="Tauri v2" src="https://img.shields.io/badge/Tauri-v2-24C8DB">
   <img alt="Rust" src="https://img.shields.io/badge/Rust-2021-orange">
   <img alt="React 18" src="https://img.shields.io/badge/React-18-61DAFB">
-  <img alt="ML-KEM-1024" src="https://img.shields.io/badge/Post--Quantum-ML--KEM--1024-14F195">
+  <img alt="X25519 + ML-KEM-768" src="https://img.shields.io/badge/Hybrid-X25519%20%2B%20ML--KEM--768-14F195">
   <img alt="Anchor" src="https://img.shields.io/badge/Solana-Anchor%200.30-9945FF">
 </p>
 
@@ -29,7 +29,7 @@ Tracked in [#3](https://github.com/ponkssol/Solana-OS/issues/3).
 
 ### 2. Post-Quantum Portable Container (`vault.solos`) & RAM Enclave
 
-Daily unlock derives an AEAD key with **Argon2id** and opens the container with **XChaCha20-Poly1305**. A 32-byte **ML-KEM-1024** shared secret, once decapsulated by the caller, is mixed into that key. The on-disk header reserves the ML-KEM-1024 ciphertext size (1568 bytes) and names **ML-DSA-87** as the signature suite. Signing material is `mlock`ed for the duration of the signing closure and `zeroize`d before return. The 24-word recovery ceremony is the lock-screen path for moving a vault to a new machine.
+Daily unlock derives an AEAD key with **Argon2id** and opens the vault file with **XChaCha20-Poly1305**. Format v2 mixes a hybrid **X25519 + ML-KEM-768** shared secret into that key; the hybrid private keys are sealed under the passphrase in the same file, so the passphrase remains the root of trust. Version 1 files are upgraded on the next unlock. The wallet key is derived from the recovery phrase at `m/44'/501'/0'/0'` (SLIP-0010, Phantom-compatible), held only in the Tauri host, and signs only requests approved in Shield review. The 24-word recovery ceremony is the lock-screen path for moving a vault to a new machine.
 
 Tracked in [#2](https://github.com/ponkssol/Solana-OS/issues/2). The byte layout and what is executable today are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -41,7 +41,7 @@ Tracked in [#4](https://github.com/ponkssol/Solana-OS/issues/4).
 
 ### 4. Real-Time Anti-Drainer Shield & Solana Builder Suite
 
-Before a wallet signs, the shield simulates the transaction. It blocks `SetAuthority` and unlimited token approvals, scores homograph domains against known Solana sites, and rejects ClickFix clipboard payloads. `SetWindowDisplayAffinity` (`WDA_EXCLUDEFROMCAPTURE`) is the Windows path that keeps the Solana OS window out of host screen capture. Dev Room is the builder surface: Anchor builds and a zero-exposure signer so cloned Cursor / VS Code never receive a plaintext `id.json`.
+Before the vault wallet signs, the shield simulates the transaction and asks you to approve or reject it. It blocks `SetAuthority` and unlimited token approvals, scores homograph domains against known Solana sites, and rejects ClickFix clipboard payloads. `SetWindowDisplayAffinity` (`WDA_EXCLUDEFROMCAPTURE`) is the Windows path that keeps the Solana OS window out of host screen capture. Dev Room is the builder surface: Anchor builds and a zero-exposure signer so cloned Cursor / VS Code never receive a plaintext `id.json`.
 
 Tracked in [#4](https://github.com/ponkssol/Solana-OS/issues/4).
 

@@ -10,7 +10,8 @@ import {
   type ContainmentEvent,
   type ShellPresentation,
 } from '../lib/tauriIpc';
-import { vaultExists, verifyVaultPassphrase } from '../lib/vaultBlob';
+import { unlockVaultFile, vaultExists } from '../lib/vaultBlob';
+import { lockWallet, setUnlocked } from '../lib/wallet';
 import {
   getEnclaveStatus,
   launchInstalledApp,
@@ -345,7 +346,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
 
   unlockVault: async (passphrase = '••••••••') => {
     try {
-      if (await vaultExists()) await verifyVaultPassphrase(passphrase);
+      if (await vaultExists()) setUnlocked(await unlockVaultFile(passphrase));
       const payload = await ipcUnlockVaultSolos(passphrase);
       set((state) => ({
         screen: 'desktop',
@@ -377,6 +378,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
   },
 
   lockVault: async () => {
+    await lockWallet().catch(() => undefined);
     const payload = await ipcLockVaultSolos();
     set((state) => ({
       screen: 'lock',

@@ -23,7 +23,6 @@ export interface Prefs {
   wallpaperId: string;
   customWallpaper: string;
   rpcUrl: string;
-  walletAddress: string;
 }
 
 const PREFS_SLOT = 'solana-os.prefs.v1';
@@ -34,7 +33,6 @@ const DEFAULTS: Prefs = {
   wallpaperId: 'sonoma',
   customWallpaper: '',
   rpcUrl: DEFAULT_RPC_URL,
-  walletAddress: '',
 };
 
 function load(): Prefs {

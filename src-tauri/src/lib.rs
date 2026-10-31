@@ -9,6 +9,7 @@ pub mod sandbox;
 pub mod security;
 mod shell_mode;
 mod vault_file;
+mod wallet;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -102,12 +103,12 @@ impl EnclaveState {
 
 pub fn derive_room_key_id(room: &str) -> String {
     match room {
-        "main" => "MLKEM1024-ENCLAVE-MAIN-9F4A".to_string(),
-        "degen" => "MLKEM1024-ENCLAVE-DEGEN-3C8E".to_string(),
-        "dev" => "MLKEM1024-ENCLAVE-DEV-7B1D".to_string(),
-        "burner" => "MLKEM1024-EPHEMERAL-BURNER-0X99".to_string(),
+        "main" => "ROOM-MAIN-9F4A".to_string(),
+        "degen" => "ROOM-DEGEN-3C8E".to_string(),
+        "dev" => "ROOM-DEV-7B1D".to_string(),
+        "burner" => "ROOM-BURNER-0X99".to_string(),
         other => format!(
-            "MLKEM1024-ENCLAVE-{}-7F01",
+            "ROOM-{}-7F01",
             other.trim().to_ascii_uppercase()
         ),
     }
@@ -495,8 +496,7 @@ fn get_enclave_status(state: State<'_, EnclaveState>) -> Result<ShellEnclaveStat
         cipher_suite: vault.cipher_suite.clone(),
         kdf: "Argon2id".into(),
         aead: "XChaCha20-Poly1305".into(),
-        // No post-quantum KEM crate is linked yet; the vault key comes from Argon2id alone.
-        kem: "Not enabled (ML-KEM-1024 planned)".into(),
+        kem: "X25519 + ML-KEM-768 hybrid (vault file v2)".into(),
         ram_enclave: "Zeroized on drop".into(),
         hardware_shard: "YubiKey shard slot".into(),
         key_id: vault.key_isolation_id.clone(),
@@ -588,6 +588,13 @@ pub fn run() {
             vault_file::read_vault_file,
             vault_file::write_vault_file,
             vault_file::unlock_vault_file,
+            vault_file::create_vault_file,
+            vault_file::vault_file_suite,
+            wallet::wallet_info,
+            wallet::wallet_lock,
+            wallet::shield_queue_sign,
+            wallet::shield_approve_sign,
+            wallet::shield_reject_sign,
             vault_file::export_vault_backup,
             vault_file::import_vault_backup,
             switch_room,
@@ -684,7 +691,7 @@ mod tests {
         // Switch from 'main' -> 'degen' with auto_freeze_previous = true
         let updated_vault = switch_room_internal(&state, "degen", true).unwrap();
         assert_eq!(updated_vault.active_room, "degen");
-        assert_eq!(updated_vault.key_isolation_id, "MLKEM1024-ENCLAVE-DEGEN-3C8E");
+        assert_eq!(updated_vault.key_isolation_id, "ROOM-DEGEN-3C8E");
 
         let telemetry = build_sandbox_telemetry(&state).unwrap();
         let main_inst = telemetry

@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import { ipcSealVault, isTauriRuntime } from './tauriIpc';
+import { isTauriRuntime } from './tauriIpc';
+import type { UnlockResult } from './wallet';
 
 // Alpha.3 kept the sealed blob in localStorage; it is moved to the app data file once.
 const LEGACY_SLOT = 'solana-os.vault.v1';
@@ -20,13 +21,13 @@ export async function vaultExists(): Promise<boolean> {
   return await invoke<boolean>('vault_file_exists');
 }
 
-export async function verifyVaultPassphrase(passphrase: string): Promise<void> {
-  await invoke('unlock_vault_file', { passphrase });
+// Opens the vault in the host, upgrades a v1 file to v2, and loads the signing key.
+export async function unlockVaultFile(passphrase: string): Promise<UnlockResult> {
+  return await invoke<UnlockResult>('unlock_vault_file', { passphrase });
 }
 
 export async function createVault(passphrase: string, mnemonic: string): Promise<void> {
-  const blob = await ipcSealVault(passphrase, new TextEncoder().encode(mnemonic));
-  await invoke('write_vault_file', { blob });
+  await invoke('create_vault_file', { passphrase, mnemonic });
 }
 
 export async function vaultFilePath(): Promise<string> {

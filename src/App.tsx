@@ -11,6 +11,8 @@ import { NotificationStack } from './components/NotificationStack';
 import { usePrefs, wallpaperCss } from './lib/settings';
 import { useIdleGuards } from './lib/useIdleGuards';
 import { SystemSettingsModal } from './components/SystemSettingsModal';
+import { ShieldReview } from './components/ShieldReview';
+import { UpdatePrompt } from './components/UpdatePrompt';
 
 export const App: React.FC = () => {
   const {
@@ -74,6 +76,8 @@ export const App: React.FC = () => {
       {settingsOpen && <SystemSettingsModal onClose={() => setSettingsOpen(false)} />}
       {spotlightOpen && <Spotlight />}
       {launchpadOpen && <Launchpad />}
+      <ShieldReview />
+      <UpdatePrompt />
     </div>
   );
 };

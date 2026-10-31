@@ -134,7 +134,7 @@ export function Launchpad() {
       </div>
 
       {tab !== 'apps' ? (
-        <div className="mt-8 w-full max-w-[1080px] flex-1 overflow-y-auto px-10 pb-[110px]">
+        <div className="mt-8 w-full max-w-[95vw] flex-1 overflow-y-auto px-6 pb-[110px]">
           {sandboxError && <Status text={`Couldn't read running apps: ${sandboxError}`} />}
           {!sandboxError && sandboxes === null && <Status text="Loading…" />}
           {!sandboxError && sandboxes !== null && instances.length === 0 && (
@@ -146,7 +146,7 @@ export function Launchpad() {
               }
             />
           )}
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-x-4 gap-y-7">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-x-4 gap-y-7">
             {instances.map((item) => (
               <button
                 key={item.instanceId}
@@ -170,7 +170,7 @@ export function Launchpad() {
           </div>
         </div>
       ) : (
-      <div className="mt-8 w-full max-w-[1080px] flex-1 overflow-y-auto px-10 pb-[110px]">
+      <div className="mt-8 w-full max-w-[95vw] flex-1 overflow-y-auto px-6 pb-[110px]">
         {appsState === 'loading' && installedApps.length === 0 && <Status text="Finding installed apps…" />}
         {appsState === 'error' && (
           <Status text={`Couldn't read installed apps: ${appsError}`}>
@@ -189,7 +189,7 @@ export function Launchpad() {
         {appsState === 'ready' && apps.length === 0 && (
           <Status text={query ? `No apps match “${query}”.` : 'No installed apps were found in the Start Menu.'} />
         )}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-x-4 gap-y-7">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-x-4 gap-y-7">
           {apps.map((app) => (
             <button
               key={`${app.path}|${app.name}`}

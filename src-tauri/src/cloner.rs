@@ -809,6 +809,7 @@ impl UniversalAppCloner {
     }
 
     #[cfg(not(target_os = "windows"))]
+    #[allow(clippy::too_many_arguments)]
     fn spawn_isolated_process(
         &mut self,
         exe_path: &str,

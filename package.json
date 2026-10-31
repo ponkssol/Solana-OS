@@ -1,7 +1,7 @@
 {
   "name": "solana-os",
   "private": true,
-  "version": "1.0.0-alpha.4",
+  "version": "1.0.0-alpha.5",
   "description": "Solana OS — Post-Quantum macOS Sonoma/Sequoia Web3 Desktop Environment (ML-KEM-1024 / vault.solos)",
   "type": "module",
   "scripts": {

@@ -4,6 +4,10 @@
 //! by the shell (so they never get a taskbar button) and are only clamped back into the
 //! shell desk area when they leave it. Small popups are clamped the same way.
 
+// The classifiers and event types are only reached from the Win32 hook; Linux CI still
+// compiles them so the unit tests run there.
+#![cfg_attr(not(windows), allow(dead_code))]
+
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 

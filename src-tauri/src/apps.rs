@@ -43,11 +43,17 @@ pub async fn list_installed_apps() -> Result<Vec<InstalledApp>, String> {
 
 /// Returns `data:image/png;base64,…` URLs keyed by executable path; failures are simply omitted.
 #[tauri::command]
-pub async fn app_icons(paths: Vec<String>) -> Result<HashMap<String, String>, String> {
+pub async fn app_icons(app: AppHandle, paths: Vec<String>) -> Result<HashMap<String, String>, String> {
+    let disk = app
+        .path()
+        .app_data_dir()
+        .ok()
+        .map(|dir| dir.join("icon-cache"))
+        .filter(|dir| std::fs::create_dir_all(dir).is_ok());
     tauri::async_runtime::spawn_blocking(move || {
         let mut out = HashMap::new();
         for path in paths {
-            if let Some(url) = cached_icon(&path) {
+            if let Some(url) = cached_icon(&path, disk.as_deref()) {
                 out.insert(path, url);
             }
         }
@@ -83,20 +89,47 @@ fn launch_blocking(state: &EnclaveState, request: LaunchAppRequest) -> Result<Cl
     result
 }
 
-fn cached_icon(path: &str) -> Option<String> {
+// Keyed on path, size and mtime so an updated executable gets a fresh icon.
+fn disk_cache_file(dir: &std::path::Path, path: &str) -> Option<std::path::PathBuf> {
+    use sha2::{Digest, Sha256};
+    let meta = std::fs::metadata(path).ok()?;
+    let mtime = meta
+        .modified()
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs();
+    let digest = Sha256::digest(format!("{}|{}|{}", path.to_lowercase(), meta.len(), mtime));
+    let name: String = digest.iter().take(16).map(|b| format!("{b:02x}")).collect();
+    Some(dir.join(format!("{name}.png")))
+}
+
+fn png_data_url(png: &[u8]) -> String {
+    use base64::Engine;
+    format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(png)
+    )
+}
+
+fn cached_icon(path: &str, disk: Option<&std::path::Path>) -> Option<String> {
     static CACHE: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     let key = path.to_lowercase();
     if let Some(hit) = cache.lock().ok()?.get(&key) {
         return hit.clone();
     }
-    let url = extract_icon_png(path).map(|png| {
-        use base64::Engine;
-        format!(
-            "data:image/png;base64,{}",
-            base64::engine::general_purpose::STANDARD.encode(png)
-        )
-    });
+    let file = disk.and_then(|dir| disk_cache_file(dir, path));
+    if let Some(png) = file.as_ref().and_then(|f| std::fs::read(f).ok()) {
+        let url = Some(png_data_url(&png));
+        cache.lock().ok()?.insert(key, url.clone());
+        return url;
+    }
+    let png = extract_icon_png(path);
+    if let (Some(png), Some(file)) = (&png, &file) {
+        let _ = std::fs::write(file, png);
+    }
+    let url = png.map(|png| png_data_url(&png));
     cache.lock().ok()?.insert(key, url.clone());
     url
 }

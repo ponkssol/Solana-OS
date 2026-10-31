@@ -1,6 +1,6 @@
 [package]
 name = "solana-os"
-version = "1.0.0-alpha.4"
+version = "1.0.0-alpha.5"
 description = "Solana OS desktop shell with contained app rooms and vault.solos"
 authors = ["Solana OS Core Team"]
 edition = "2021"
@@ -25,6 +25,12 @@ sha2 = "0.10"
 zeroize = { version = "1", features = ["derive"] }
 png = "0.17"
 base64 = "0.22"
+ml-kem = "0.2"
+x25519-dalek = { version = "2", features = ["static_secrets", "zeroize"] }
+ed25519-dalek = { version = "2", features = ["zeroize"] }
+hmac = "0.12"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+bs58 = "0.5"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

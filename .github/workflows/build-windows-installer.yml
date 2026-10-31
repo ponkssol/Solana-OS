@@ -68,7 +68,7 @@ jobs:
             Copy-Item $sig -Destination "out/$exeName.sig"
             $manifest = [ordered]@{
               version = $version
-              notes = "Solana OS $version"
+              notes = (Get-Content docs/RELEASE_NOTES.md -Raw).Trim()
               pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
               platforms = @{
                 "windows-x86_64" = @{
@@ -95,9 +95,7 @@ jobs:
           prerelease: true
           draft: false
           make_latest: false
-          body: |
-            Solana OS v${{ steps.version.outputs.version }} prerelease for Windows x64.
-            Install with the NSIS setup .exe, or use the .msi for managed deployment.
+          body_path: docs/RELEASE_NOTES.md
           files: out/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
