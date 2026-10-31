@@ -26,7 +26,7 @@ export interface Prefs {
   walletAddress: string;
 }
 
-const KEY = 'solana-os.prefs.v1';
+const PREFS_SLOT = 'solana-os.prefs.v1';
 
 const DEFAULTS: Prefs = {
   autoLockMinutes: 10,
@@ -39,7 +39,7 @@ const DEFAULTS: Prefs = {
 
 function load(): Prefs {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
+    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(PREFS_SLOT) || '{}') };
   } catch {
     return DEFAULTS;
   }
@@ -55,7 +55,7 @@ export const usePrefs = create<PrefsStore>((set, get) => ({
     set(patch);
     const { update: _update, ...prefs } = { ...get(), ...patch };
     try {
-      localStorage.setItem(KEY, JSON.stringify(prefs));
+      localStorage.setItem(PREFS_SLOT, JSON.stringify(prefs));
     } catch {
       // A custom image too large for localStorage still applies for this session.
     }
