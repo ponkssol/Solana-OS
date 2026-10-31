@@ -20,6 +20,8 @@ argon2 = "0.5"
 chacha20poly1305 = "0.10"
 sha2 = "0.10"
 zeroize = { version = "1", features = ["derive"] }
+png = "0.17"
+base64 = "0.22"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -37,4 +39,9 @@ windows = { version = "0.58", features = [
     "Win32_System_LibraryLoader",
     "Win32_UI_Accessibility",
     "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_Storage_FileSystem",
 ] }

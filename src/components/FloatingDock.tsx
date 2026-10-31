@@ -1,21 +1,22 @@
 import React from 'react';
 import { ipcContainmentFocus } from '../lib/tauriIpc';
 import { useOSStore, WindowId } from '../store/useOSStore';
+import { AppIcon } from './AppIcon';
 import { DOCK_ICONS, DockGlass, FIGMA } from './macosMaterials';
 
 const APP_SLOTS: { label: string; windowId: WindowId }[] = [
-  { label: 'Solana OS', windowId: 'vault-monitor' },
+  { label: 'Active Sandboxes', windowId: 'app-cloner' },
   { label: 'Launchpad', windowId: 'app-cloner' },
-  { label: 'Safari', windowId: 'degen-terminal' },
-  { label: 'Messages', windowId: 'phantom-wallet' },
-  { label: 'Mail', windowId: 'solflare-wallet' },
-  { label: 'Maps', windowId: 'backpack-wallet' },
-  { label: 'Photos', windowId: 'dev-console' },
-  { label: 'FaceTime', windowId: 'burner-session' },
+  { label: 'Anti-Drainer Shield', windowId: 'app-cloner' },
+  { label: 'Phantom', windowId: 'app-cloner' },
+  { label: 'Solflare', windowId: 'app-cloner' },
+  { label: 'Backpack', windowId: 'app-cloner' },
+  { label: 'Builder Suite', windowId: 'app-cloner' },
+  { label: 'Quantum Vault', windowId: 'app-cloner' },
 ];
 
 export const FloatingDock: React.FC = () => {
-  const { openWindow, focusWindow, setShellView, setWalletBrand, hosted } = useOSStore();
+  const { openWindow, focusWindow, setShellView, setWalletBrand, setLaunchpadOpen, hosted, instanceBadges } = useOSStore();
   const seen = new Set<string>();
   const running = hosted.filter((win) => {
     if (seen.has(win.instanceId)) return false;
@@ -23,6 +24,10 @@ export const FloatingDock: React.FC = () => {
     return true;
   });
   const openView = (index: number) => {
+    if (index === 1) {
+      setLaunchpadOpen(true);
+      return;
+    }
     openWindow('app-cloner');
     focusWindow('app-cloner');
     if (index === 2) setShellView('shield');
@@ -76,9 +81,13 @@ export const FloatingDock: React.FC = () => {
           }}
           className="relative mb-[4px] flex h-[47px] w-[36px] flex-col items-center"
         >
-          <span className="flex size-[36px] items-center justify-center rounded-[8px] bg-[#1e1e1e] text-[15px] font-[700] text-white/85">
-            {(app.appName.trim()[0] || 'A').toUpperCase()}
-          </span>
+          <AppIcon
+            path={instanceBadges[app.instanceId]?.exePath ?? ''}
+            name={app.appName}
+            size={36}
+            cloned={instanceBadges[app.instanceId]?.cloned}
+            cloneNumber={instanceBadges[app.instanceId]?.cloneNumber}
+          />
           <span className="absolute bottom-0 size-1 rounded-full bg-white/80" />
         </button>
       ))}

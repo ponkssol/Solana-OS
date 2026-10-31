@@ -10,6 +10,15 @@ import {
   type ContainmentEvent,
   type ShellPresentation,
 } from '../lib/tauriIpc';
+import {
+  getEnclaveStatus,
+  launchInstalledApp,
+  listInstalledApps,
+  loadAppIcons,
+  toggleFreezeProcess,
+  type InstalledApp,
+  type SandboxInstance,
+} from '../lib/tauriBridge';
 
 export type OSScreenState = 'boot' | 'lock' | 'desktop';
 export type ShellView = 'sandboxes' | 'vault' | 'shield' | 'builder' | 'terminal';
@@ -35,6 +44,21 @@ export interface HostedAppWindow {
   primary: boolean;
   isMinimized: boolean;
 }
+
+export interface InstanceBadge {
+  exePath: string;
+  cloned: boolean;
+  cloneNumber: number;
+}
+
+export interface ShellNotification {
+  id: string;
+  title: string;
+  body: string;
+  at: number;
+}
+
+export type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface OSWindow {
   id: WindowId;
@@ -111,7 +135,7 @@ interface OSStoreState {
     id: WindowId,
     frame: { x: number; y: number; width: number; height: number },
   ) => void;
-  openHostedApp: (seed: { instanceId: string; appName: string; roomId: string }) => void;
+  openHostedApp: (seed: { instanceId: string; appName: string; roomId: string } & InstanceBadge) => void;
   applyContainmentEvent: (event: ContainmentEvent) => void;
   focusHosted: (key: string) => string | null;
   focusHostedInstance: (instanceId: string) => string | null;
@@ -120,7 +144,7 @@ interface OSStoreState {
   spawnClonedInstance: (targetApp: string, targetRoom: RoomId) => void;
   syncVaultStatus: () => Promise<void>;
   toggleWindowFreeze: (id: WindowId) => void;
-  toggleProcessFreeze: () => void;
+  toggleProcessFreeze: () => Promise<void>;
   setSpotlightOpen: (open: boolean) => void;
   setDisplayBrightness: (value: number) => void;
   setShellView: (view: ShellView) => void;
@@ -128,7 +152,23 @@ interface OSStoreState {
   setWalletBrand: (brand: WalletBrandName | null) => void;
   setSettingsOpen: (open: boolean) => void;
   setTerminalOpen: (open: boolean) => void;
+  installedApps: InstalledApp[];
+  appsState: LoadState;
+  appsError: string;
+  icons: Record<string, string>;
+  instanceBadges: Record<string, InstanceBadge>;
+  launchpadOpen: boolean;
+  notifications: ShellNotification[];
+  setLaunchpadOpen: (open: boolean) => void;
+  loadInstalledApps: () => Promise<void>;
+  requestIcons: (paths: string[]) => Promise<void>;
+  launchApp: (app: InstalledApp, clone: boolean) => Promise<void>;
+  rememberInstances: (instances: SandboxInstance[]) => void;
+  notify: (title: string, body: string) => void;
+  dismissNotification: (id: string) => void;
 }
+
+const pendingIcons = new Set<string>();
 
 const INITIAL_WINDOWS: OSWindow[] = [
   {
@@ -188,7 +228,7 @@ const INITIAL_WINDOWS: OSWindow[] = [
     id: 'app-cloner',
     title: 'Solana OS App Cloner (+)',
     subtitle: 'Spawn Room-Isolated Standalone Instances (Phantom, Solflare, Cursor, Browser)',
-    isOpen: true,
+    isOpen: false,
     isMinimized: false,
     isMaximized: false,
     zIndex: 18,
@@ -255,19 +295,19 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
   activeRoom: 'main',
   vault: {
     enclaveName: 'vault.solos',
-    identity: 'nanda.solos',
+    identity: '',
     cipherSuite: 'ML-KEM-1024',
     locked: true,
     keyIsolationId: ROOM_CONFIGS.main.keyIsolationId,
-    shieldActive: true,
-    onChainVerified: true,
-    lastHandshakeMs: 12,
+    shieldActive: false,
+    onChainVerified: false,
+    lastHandshakeMs: 0,
     ipcBridgeMode: isTauriRuntime() ? 'tauri-v2-native' : 'browser-enclave-sim',
   },
   windows: INITIAL_WINDOWS,
   hosted: [],
   topZIndex: 20,
-  clonedAppsCount: 2,
+  clonedAppsCount: 0,
   spotlightOpen: false,
   displayBrightness: 100,
   shellView: 'sandboxes',
@@ -276,24 +316,16 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
   settingsOpen: false,
   terminalOpen: false,
   shellMode: 'os',
-  processFreezeActive: true,
-  frozenProcessCount: 3,
-  auditLogs: [
-    {
-      id: 'init-1',
-      timestamp: '01:14:02',
-      event: 'Mounted vault.solos post-quantum lattice enclave',
-      room: 'main',
-      cipher: 'ML-KEM-1024',
-    },
-    {
-      id: 'init-2',
-      timestamp: '01:14:08',
-      event: 'On-chain attestation verified for nanda.solos',
-      room: 'main',
-      cipher: 'ML-KEM-1024',
-    },
-  ],
+  processFreezeActive: false,
+  frozenProcessCount: 0,
+  auditLogs: [],
+  installedApps: [],
+  appsState: 'idle',
+  appsError: '',
+  icons: {},
+  instanceBadges: {},
+  launchpadOpen: false,
+  notifications: [],
 
   setScreen: (screen) => set({ screen }),
 
@@ -318,6 +350,10 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
         vault: {
           ...state.vault,
           locked: payload.locked,
+          identity: payload.identity,
+          enclaveName: payload.enclaveName,
+          shieldActive: payload.shieldActive,
+          onChainVerified: payload.onChainVerified,
           keyIsolationId: payload.keyIsolationId,
           lastHandshakeMs: payload.lastHandshakeMs,
         },
@@ -493,8 +529,13 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
 
   openHostedApp: (seed) =>
     set((state) => {
-      if (state.hosted.some((win) => win.instanceId === seed.instanceId)) return state;
+      const instanceBadges = {
+        ...state.instanceBadges,
+        [seed.instanceId]: { exePath: seed.exePath, cloned: seed.cloned, cloneNumber: seed.cloneNumber },
+      };
+      if (state.hosted.some((win) => win.instanceId === seed.instanceId)) return { instanceBadges };
       return {
+        instanceBadges,
         hosted: [
           ...state.hosted,
           {
@@ -631,29 +672,17 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
       ).length,
     })),
 
-  toggleProcessFreeze: () =>
-    set((state) => {
-      const next = !state.processFreezeActive;
-      return {
-        processFreezeActive: next,
-        frozenProcessCount: next ? 3 : 0,
-        windows: state.windows.map((w) =>
-          w.id === 'dev-console' ? { ...w, isFrozen: next } : w
-        ),
-        auditLogs: [
-          {
-            id: `freeze-${Date.now()}`,
-            timestamp: nowTimeLabel(),
-            event: next
-              ? 'Process Freeze engaged • NtSuspendProcess (0% CPU)'
-              : 'Process Freeze released • NtResumeProcess',
-            room: state.activeRoom,
-            cipher: 'ML-KEM-1024',
-          },
-          ...state.auditLogs.slice(0, 14),
-        ],
-      };
-    }),
+  toggleProcessFreeze: async () => {
+    const freeze = !get().processFreezeActive;
+    try {
+      const status = await getEnclaveStatus();
+      const targets = status.sandboxes.filter((item) => item.status === (freeze ? 'Running' : 'Frozen'));
+      await Promise.all(targets.map((item) => toggleFreezeProcess(item.instanceId)));
+      set({ processFreezeActive: freeze, frozenProcessCount: freeze ? targets.length : 0 });
+    } catch (error) {
+      get().notify('Freeze failed', String(error));
+    }
+  },
 
   setSpotlightOpen: (spotlightOpen) => set({ spotlightOpen }),
 
@@ -674,14 +703,88 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
     })),
 
   syncVaultStatus: async () => {
-    const status = await ipcGetVaultStatus();
-    set((state) => ({
-      vault: {
-        ...state.vault,
-        locked: status.locked,
-        keyIsolationId: status.keyIsolationId,
-        lastHandshakeMs: status.lastHandshakeMs,
-      },
-    }));
+    try {
+      const status = await ipcGetVaultStatus();
+      set((state) => ({
+        vault: {
+          ...state.vault,
+          locked: status.locked,
+          identity: status.identity,
+          enclaveName: status.enclaveName,
+          shieldActive: status.shieldActive,
+          onChainVerified: status.onChainVerified,
+          keyIsolationId: status.keyIsolationId,
+          lastHandshakeMs: status.lastHandshakeMs,
+        },
+      }));
+    } catch {
+      // Outside the desktop app there is no vault to read; the lock screen reports it on unlock.
+    }
   },
+
+  setLaunchpadOpen: (launchpadOpen) => set({ launchpadOpen }),
+
+  loadInstalledApps: async () => {
+    if (get().appsState === 'loading') return;
+    set({ appsState: 'loading', appsError: '' });
+    try {
+      const apps = await listInstalledApps();
+      set({ installedApps: apps, appsState: 'ready' });
+      void get().requestIcons(apps.map((app) => app.path));
+    } catch (error) {
+      set({ appsState: 'error', appsError: String(error) });
+    }
+  },
+
+  requestIcons: async (paths) => {
+    const known = get().icons;
+    const missing = [...new Set(paths)].filter((path) => path && !known[path] && !pendingIcons.has(path));
+    if (missing.length === 0) return;
+    missing.forEach((path) => pendingIcons.add(path));
+    // Small batches let the first icons paint while the rest are still extracting.
+    for (let i = 0; i < missing.length; i += 12) {
+      try {
+        const found = await loadAppIcons(missing.slice(i, i + 12));
+        set((state) => ({ icons: { ...state.icons, ...found } }));
+      } catch {
+        // Tiles keep their letter fallback when an icon can't be extracted.
+      }
+    }
+  },
+
+  launchApp: async (app, clone) => {
+    try {
+      const inst = await launchInstalledApp(app, get().activeRoom, clone);
+      get().openHostedApp({
+        instanceId: inst.instanceId,
+        appName: inst.appName,
+        roomId: inst.roomId,
+        exePath: inst.exePath,
+        cloned: inst.cloned,
+        cloneNumber: inst.cloneNumber,
+      });
+      if (clone) set((state) => ({ clonedAppsCount: state.clonedAppsCount + 1 }));
+    } catch (error) {
+      get().notify(`Couldn't open ${app.name}`, String(error));
+    }
+  },
+
+  rememberInstances: (instances) => {
+    set((state) => {
+      const instanceBadges = { ...state.instanceBadges };
+      for (const inst of instances) {
+        instanceBadges[inst.instanceId] = { exePath: inst.exePath, cloned: inst.cloned, cloneNumber: inst.cloneNumber };
+      }
+      return { instanceBadges };
+    });
+    void get().requestIcons(instances.map((inst) => inst.exePath));
+  },
+
+  notify: (title, body) =>
+    set((state) => ({
+      notifications: [{ id: `${Date.now()}-${state.notifications.length}`, title, body, at: Date.now() }, ...state.notifications].slice(0, 4),
+    })),
+
+  dismissNotification: (id) =>
+    set((state) => ({ notifications: state.notifications.filter((note) => note.id !== id) })),
 }));

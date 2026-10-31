@@ -1,3 +1,4 @@
+mod apps;
 pub mod cloner;
 mod containment;
 pub mod diag;
@@ -515,6 +516,8 @@ fn clone_app_instance(
         extra_args: None,
         launch_on_enclave_desktop: Some(false),
         instance_label: None,
+        isolate: None,
+        display_name: None,
     });
     if let Err(err) = &result {
         diag!("clone {app_id} failed: {err}");
@@ -546,28 +549,6 @@ fn unlock_vault_container(
     state: State<'_, EnclaveState>,
 ) -> Result<VaultStatusPayload, String> {
     unlock_vault_solos(passphrase, state)
-}
-
-#[tauri::command]
-fn simulate_solana_tx() -> security::anti_drainer::TransactionSimResult {
-    let request = security::anti_drainer::SolanaTxSimulationRequest {
-        origin_url: Some("https://jup.ag".into()),
-        signer_wallet: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU".into(),
-        wallet_sol_balance_lamports: 142_850_000_000,
-        instructions: vec![security::anti_drainer::SimulatedInstruction {
-            program_id: "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4".into(),
-            instruction_type: "route".into(),
-            authority_type: None,
-            new_authority: None,
-            delegate: None,
-            destination: None,
-            amount: Some(25_000_000_000),
-            token_mint: None,
-            is_unlimited_approval: Some(false),
-        }],
-        raw_payload_preview: Some("jupiter v6 exact-in".into()),
-    };
-    security::anti_drainer::simulate_and_verify_transaction(&request)
 }
 
 #[tauri::command]
@@ -621,7 +602,9 @@ pub fn run() {
             toggle_freeze_process,
             terminate_sandbox,
             unlock_vault_container,
-            simulate_solana_tx,
+            apps::list_installed_apps,
+            apps::app_icons,
+            apps::launch_app,
             sign_with_ram_enclave,
             run_sandboxed_cli_command,
             shell_mode::set_shell_presentation,

@@ -83,6 +83,11 @@ pub struct CloneLaunchRequest {
     pub launch_on_enclave_desktop: Option<bool>,
     #[serde(default, alias = "instance_label")]
     pub instance_label: Option<String>,
+    /// `Some(false)` opens the app with its normal profile instead of an isolated clone.
+    #[serde(default)]
+    pub isolate: Option<bool>,
+    #[serde(default)]
+    pub display_name: Option<String>,
 }
 
 /// Active or stopped cloned application instance tracked per Room.
@@ -107,6 +112,8 @@ pub struct ClonedAppInstance {
     pub cpu_usage_percent: f32,
     pub memory_mb: f32,
     pub launched_at_ms: u64,
+    pub cloned: bool,
+    pub clone_number: u32,
 }
 
 pub fn now_epoch_ms() -> u64 {
@@ -596,8 +603,38 @@ impl UniversalAppCloner {
         let (dirs, manifest) =
             self.prepare_isolated_room_directories(&clean_room, &clean_app, &app_subkey)?;
 
-        let launch_args =
-            build_isolated_launch_args(&clean_app, &dirs, request.extra_args.as_deref());
+        let isolate = request.isolate.unwrap_or(true);
+        let launch_args = if isolate {
+            build_isolated_launch_args(&clean_app, &dirs, request.extra_args.as_deref())
+        } else {
+            request
+                .extra_args
+                .clone()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|arg| !arg.trim().is_empty())
+                .collect()
+        };
+        let mut manifest = manifest;
+        if !isolate {
+            manifest.env_overrides.clear();
+        }
+        let app_name = request
+            .display_name
+            .clone()
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or(app_name);
+        let clone_number = if isolate {
+            self.instances
+                .values()
+                .filter(|inst| inst.cloned && inst.app_id == clean_app)
+                .map(|inst| inst.clone_number)
+                .max()
+                .unwrap_or(0)
+                + 1
+        } else {
+            0
+        };
 
         let target_desktop = if request.launch_on_enclave_desktop.unwrap_or(false) {
             SOLANA_OS_ENCLAVE_DESKTOP.to_string()
@@ -644,6 +681,8 @@ impl UniversalAppCloner {
             cpu_usage_percent: default_cpu,
             memory_mb: default_mem,
             launched_at_ms: now_epoch_ms(),
+            cloned: isolate,
+            clone_number,
         };
 
         self.instances.insert(instance_id, instance.clone());
