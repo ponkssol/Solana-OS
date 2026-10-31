@@ -1,9 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { ipcDiagLog } from '../lib/tauriIpc';
 import { useOSStore } from '../store/useOSStore';
 import { BRAND_ASSETS } from '../tokens/designTokens';
 import { WALLPAPER, WIFI_ICON } from './macosMaterials';
 
 export const LockScreen: React.FC = () => {
+  // Lands in solana-os.log next to the backend input probe, to tell a click that never
+  // reaches the page apart from one the page ignores.
+  useEffect(() => {
+    void ipcDiagLog('lock screen mounted').catch(() => undefined);
+    const onPointer = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target.tagName.toLowerCase() : 'none';
+      void ipcDiagLog(`lock screen pointerdown at ${event.clientX},${event.clientY} on ${target}`).catch(() => undefined);
+    };
+    window.addEventListener('pointerdown', onPointer, { capture: true, once: true });
+    return () => window.removeEventListener('pointerdown', onPointer, { capture: true });
+  }, []);
+
   const { unlockVault, setScreen } = useOSStore();
   const [passphrase, setPassphrase] = useState('solana');
   const [sheet, setSheet] = useState<'restore' | 'create' | 'recovery' | null>(null);

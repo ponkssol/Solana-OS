@@ -627,7 +627,8 @@ pub fn run() {
             shell_mode::set_shell_presentation,
             shell_mode::get_shell_presentation,
             shell_mode::minimize_shell,
-            containment::containment_set_slot,
+            containment::containment_set_desk,
+            diag::diag_log,
             containment::containment_focus,
             containment::containment_close_window
         ])

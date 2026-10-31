@@ -7,8 +7,8 @@ use windows::Win32::Foundation::HWND;
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, HWND_NOTOPMOST, HWND_TOPMOST,
-    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, WINDOW_STYLE, WS_BORDER,
-    WS_CAPTION, WS_CLIPSIBLINGS, WS_DLGFRAME, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME, WS_VISIBLE,
+    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WINDOW_STYLE, WS_BORDER, WS_CAPTION,
+    WS_CLIPSIBLINGS, WS_DLGFRAME, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
 };
 
 // 0 = fullscreen OS, 1 = windowed Windows mode.
@@ -69,10 +69,61 @@ pub fn install(app: &AppHandle) {
         }
     });
     let _ = window.show();
-    // The shell starts behind whatever launched it; until it holds the foreground,
-    // WebView2 swallows the first clicks on the lock screen.
     let _ = window.set_focus();
+    #[cfg(windows)]
+    if let Ok(hwnd) = hwnd_of(&window) {
+        probe_input(hwnd.0 as isize);
+    }
     crate::diag!("shell shown in {} mode", current().as_str());
+}
+
+// Logs, for the first seconds after boot, whether the shell holds the foreground, is
+// enabled, answers messages and is the window under the cursor; together these say why
+// clicks on the lock screen do not arrive. Foreground is taken back if another window has it.
+#[cfg(windows)]
+fn probe_input(shell_bits: isize) {
+    use windows::Win32::Foundation::{LPARAM, POINT, WPARAM};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetAncestor, GetClassNameW, GetCursorPos, GetForegroundWindow, SendMessageTimeoutW, WindowFromPoint,
+        GA_ROOT, SMTO_ABORTIFHUNG, WM_NULL, WS_DISABLED,
+    };
+    let _ = std::thread::Builder::new().name("solos-input-probe".into()).spawn(move || {
+        let shell = HWND(shell_bits as *mut _);
+        for tick in 0..20 {
+            std::thread::sleep(std::time::Duration::from_millis(if tick == 0 { 300 } else { 1000 }));
+            unsafe {
+                let foreground = GetForegroundWindow();
+                let enabled = GetWindowLongPtrW(shell, GWL_STYLE) as u32 & WS_DISABLED.0 == 0;
+                let mut result = 0usize;
+                let answered = SendMessageTimeoutW(
+                    shell,
+                    WM_NULL,
+                    WPARAM(0),
+                    LPARAM(0),
+                    SMTO_ABORTIFHUNG,
+                    500,
+                    Some(&mut result),
+                )
+                .0 != 0;
+                let mut cursor = POINT::default();
+                let _ = GetCursorPos(&mut cursor);
+                let under = WindowFromPoint(cursor);
+                let mut class = [0u16; 128];
+                let len = GetClassNameW(under, &mut class) as usize;
+                let under_root = GetAncestor(under, GA_ROOT);
+                crate::diag!(
+                    "input probe foreground_is_shell={} enabled={enabled} responsive={answered} under={:#x} class={} under_is_shell={}",
+                    foreground == shell,
+                    under.0 as isize,
+                    String::from_utf16_lossy(&class[..len]),
+                    under_root == shell
+                );
+                if foreground != shell && current() == ShellMode::Os {
+                    crate::containment::bring_to_front(shell_bits);
+                }
+            }
+        }
+    });
 }
 
 pub fn apply(window: &WebviewWindow, mode: ShellMode) -> Result<(), String> {
@@ -216,7 +267,9 @@ fn hwnd_of(window: &WebviewWindow) -> Result<HWND, String> {
 fn popup_style(current: isize) -> isize {
     let style = WINDOW_STYLE(current as u32);
     let cleared = style & !(WS_CAPTION | WS_THICKFRAME | WS_BORDER | WS_DLGFRAME | WS_SYSMENU);
-    let next = cleared | WS_POPUP | WS_VISIBLE | WS_CLIPSIBLINGS | WS_MINIMIZEBOX;
+    // WS_VISIBLE is left to tao; forcing it here showed the window before tao's own show(),
+    // outside its bookkeeping of the hidden window and its WebView2 controller.
+    let next = cleared | WS_POPUP | WS_CLIPSIBLINGS | WS_MINIMIZEBOX;
     next.0 as isize
 }
 
@@ -237,7 +290,7 @@ fn sync_window_style(window: &WebviewWindow, topmost: bool) -> Result<(), String
         }
         let insert_after = if topmost { HWND_TOPMOST } else { HWND_NOTOPMOST };
         let flags = if style_changed {
-            SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_SHOWWINDOW
+            SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_NOACTIVATE
         } else {
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
         };
