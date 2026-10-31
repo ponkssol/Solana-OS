@@ -132,3 +132,12 @@ img {
   color: #f5f5f5;
   appearance: none;
 }
+
+/* Overlay-style scrolling like macOS: content still scrolls by wheel, trackpad and touch. */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}

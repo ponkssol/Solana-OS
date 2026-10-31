@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{AppHandle, Manager};
 
 use crate::cloner::{build_supported_app_catalog, ClonedAppInstance, CloneLaunchRequest};
 use crate::EnclaveState;
@@ -57,11 +57,15 @@ pub async fn app_icons(paths: Vec<String>) -> Result<HashMap<String, String>, St
     .map_err(|err| err.to_string())
 }
 
+// Async so a slow spawn never blocks the main thread, which swallowed Launchpad clicks.
 #[tauri::command]
-pub fn launch_app(
-    request: LaunchAppRequest,
-    state: State<'_, EnclaveState>,
-) -> Result<ClonedAppInstance, String> {
+pub async fn launch_app(app: AppHandle, request: LaunchAppRequest) -> Result<ClonedAppInstance, String> {
+    tauri::async_runtime::spawn_blocking(move || launch_blocking(&app.state::<EnclaveState>(), request))
+        .await
+        .map_err(|err| err.to_string())?
+}
+
+fn launch_blocking(state: &EnclaveState, request: LaunchAppRequest) -> Result<ClonedAppInstance, String> {
     let mut cloner = state.cloner.lock().map_err(|_| "App Cloner mutex poisoned")?;
     let result = cloner.clone_and_launch(CloneLaunchRequest {
         app_id: request.id.clone(),
