@@ -8,6 +8,7 @@ pub mod quantum_vault;
 pub mod sandbox;
 pub mod security;
 mod shell_mode;
+mod vault_file;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -575,12 +576,20 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(initial_state)
         .invoke_handler(tauri::generate_handler![
             unlock_vault_solos,
             lock_vault_solos,
             seal_vault_solos,
             open_vault_solos,
+            vault_file::vault_file_exists,
+            vault_file::vault_file_path,
+            vault_file::read_vault_file,
+            vault_file::write_vault_file,
+            vault_file::unlock_vault_file,
+            vault_file::export_vault_backup,
+            vault_file::import_vault_backup,
             switch_room,
             get_vault_status,
             list_supported_apps,

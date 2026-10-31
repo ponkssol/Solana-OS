@@ -6,12 +6,11 @@ import {
   ipcSetShellPresentation,
   ipcSwitchRoom,
   ipcUnlockVaultSolos,
-  ipcOpenVault,
   isTauriRuntime,
   type ContainmentEvent,
   type ShellPresentation,
 } from '../lib/tauriIpc';
-import { readSealedVault } from '../lib/vaultBlob';
+import { vaultExists, verifyVaultPassphrase } from '../lib/vaultBlob';
 import {
   getEnclaveStatus,
   launchInstalledApp,
@@ -346,8 +345,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
 
   unlockVault: async (passphrase = '••••••••') => {
     try {
-      const blob = readSealedVault();
-      if (blob) await ipcOpenVault(passphrase, blob);
+      if (await vaultExists()) await verifyVaultPassphrase(passphrase);
       const payload = await ipcUnlockVaultSolos(passphrase);
       set((state) => ({
         screen: 'desktop',
