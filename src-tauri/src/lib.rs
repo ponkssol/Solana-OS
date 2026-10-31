@@ -645,6 +645,8 @@ mod tests {
                     extra_args: None,
                     launch_on_enclave_desktop: Some(false),
                     instance_label: Some("Main Workspace".to_string()),
+                    isolate: None,
+                    display_name: None,
                 })
                 .unwrap();
 
@@ -656,6 +658,8 @@ mod tests {
                     extra_args: None,
                     launch_on_enclave_desktop: Some(false),
                     instance_label: Some("Degen Burner".to_string()),
+                    isolate: None,
+                    display_name: None,
                 })
                 .unwrap();
 

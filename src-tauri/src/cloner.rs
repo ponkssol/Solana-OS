@@ -753,6 +753,7 @@ impl UniversalAppCloner {
     }
 
     #[cfg(target_os = "windows")]
+    #[allow(clippy::too_many_arguments)]
     fn spawn_isolated_process(
         &mut self,
         exe_path: &str,
@@ -951,6 +952,8 @@ mod tests {
                 extra_args: Some(vec!["https://jup.ag".to_string()]),
                 launch_on_enclave_desktop: Some(true),
                 instance_label: Some("Degen Burner".to_string()),
+                isolate: None,
+                display_name: None,
             })
             .expect("chrome clone in degen room should succeed");
 

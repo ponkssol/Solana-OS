@@ -327,6 +327,8 @@ mod tests {
                 extra_args: None,
                 launch_on_enclave_desktop: Some(false),
                 instance_label: Some("Sniper Tab".to_string()),
+                isolate: None,
+                display_name: None,
             })
             .unwrap();
 
@@ -338,6 +340,8 @@ mod tests {
                 extra_args: None,
                 launch_on_enclave_desktop: Some(false),
                 instance_label: Some("Alpha Calls".to_string()),
+                isolate: None,
+                display_name: None,
             })
             .unwrap();
 
