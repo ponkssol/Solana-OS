@@ -677,11 +677,14 @@ impl UniversalAppCloner {
         let pid = instance.pid;
         let tracked_id = instance.instance_id.clone();
         if instance.status != AppInstanceStatus::Stopped {
-            crate::containment::release(&tracked_id);
+            let still_tracked = crate::containment::release(&tracked_id);
+            // Once the job is gone the PID may already belong to an unrelated process.
             #[cfg(target_os = "windows")]
-            {
+            if still_tracked {
                 let _ = terminate_windows_process(pid);
             }
+            #[cfg(not(target_os = "windows"))]
+            let _ = still_tracked;
             #[cfg(not(target_os = "windows"))]
             {
                 if let Some(mut child) = self.child_handles.remove(&pid) {
@@ -699,6 +702,15 @@ impl UniversalAppCloner {
         }
 
         Ok(instance.clone())
+    }
+
+    /// Marks an instance whose process tree ended on its own as stopped.
+    pub fn mark_exited(&mut self, instance_id: &str) {
+        if let Some(instance) = self.instances.get_mut(instance_id) {
+            instance.status = AppInstanceStatus::Stopped;
+            instance.cpu_usage_percent = 0.0;
+            instance.memory_mb = 0.0;
+        }
     }
 
     #[cfg(target_os = "windows")]

@@ -103,14 +103,16 @@ pub fn nudge() {
     }
 }
 
-pub fn release(instance_id: &str) {
+/// Returns false when the instance was already reaped after exiting on its own.
+pub fn release(instance_id: &str) -> bool {
     #[cfg(windows)]
     {
-        win::release(instance_id);
+        win::release(instance_id)
     }
     #[cfg(not(windows))]
     {
         let _ = instance_id;
+        true
     }
 }
 
@@ -386,12 +388,13 @@ mod win {
         }
     }
 
-    pub fn release(instance_id: &str) {
-        let handle_bits = {
+    pub fn release(instance_id: &str) -> bool {
+        let job = {
             let mut jobs = JOBS.lock().unwrap_or_else(|err| err.into_inner());
-            jobs.remove(instance_id).map(|job| job.handle_bits)
+            jobs.remove(instance_id).map(|job| (job.handle_bits, job.exited))
         };
-        if let Some(bits) = handle_bits {
+        let live = matches!(job, Some((_, false)));
+        if let Some((bits, _)) = job {
             if bits != 0 {
                 unsafe {
                     let _ = CloseHandle(bits_handle(bits));
@@ -402,6 +405,7 @@ mod win {
             cache.at = None;
         }
         post(Command::Release(instance_id.to_string()));
+        live
     }
 
     fn pump(ready: mpsc::Sender<()>) {
@@ -1111,7 +1115,22 @@ mod win {
             }
             drop_instance(&id);
             release_job_only(&id);
+            mark_stopped(&id);
         }
+    }
+
+    fn mark_stopped(instance_id: &str) {
+        let app = {
+            let guard = RUNTIME.lock().unwrap_or_else(|err| err.into_inner());
+            guard.as_ref().map(|runtime| runtime.app.clone())
+        };
+        let Some(app) = app else {
+            return;
+        };
+        let state = app.state::<crate::EnclaveState>();
+        if let Ok(mut cloner) = state.cloner.lock() {
+            cloner.mark_exited(instance_id);
+        };
     }
 
     fn release_job_only(instance_id: &str) {

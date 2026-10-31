@@ -158,6 +158,15 @@ function appLabel(appId: string): string {
   return appId.slice(0, 1).toUpperCase() + appId.slice(1);
 }
 
+export function markSandboxExited(id: string): EnclaveSnapshot {
+  const item = memory.sandboxes.find((entry) => entry.id === id);
+  if (item) {
+    item.stateLabel = 'Exited';
+    item.color = '#8e8e93';
+  }
+  return snapshot();
+}
+
 export async function toggleFreezeProcess(id: string): Promise<EnclaveSnapshot> {
   await touch('toggle_freeze_process', { instanceId: id });
   const item = memory.sandboxes.find((entry) => entry.id === id);
