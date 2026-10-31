@@ -6,10 +6,12 @@ import {
   ipcSetShellPresentation,
   ipcSwitchRoom,
   ipcUnlockVaultSolos,
+  ipcOpenVault,
   isTauriRuntime,
   type ContainmentEvent,
   type ShellPresentation,
 } from '../lib/tauriIpc';
+import { readSealedVault } from '../lib/vaultBlob';
 import {
   getEnclaveStatus,
   launchInstalledApp,
@@ -174,7 +176,7 @@ const INITIAL_WINDOWS: OSWindow[] = [
   {
     id: 'vault-monitor',
     title: 'vault.solos — Post-Quantum Enclave Monitor',
-    subtitle: 'ML-KEM-1024 Lattice Key Isolation & Hardware Shield',
+    subtitle: 'Argon2id + XChaCha20-Poly1305 sealed container',
     isOpen: false,
     isMinimized: false,
     isMaximized: false,
@@ -182,7 +184,7 @@ const INITIAL_WINDOWS: OSWindow[] = [
     position: { x: 72, y: 64 },
     size: { width: 920, height: 540 },
     room: 'all',
-    badgeText: 'ML-KEM-1024 • SEALED',
+    badgeText: 'SEALED',
   },
   {
     id: 'degen-terminal',
@@ -339,11 +341,13 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
     set({
       screen: 'lock',
       bootProgress: 100,
-      bootStatusText: 'vault.solos Enclave Ready • ML-KEM-1024 Verified',
+      bootStatusText: 'vault.solos ready',
     }),
 
   unlockVault: async (passphrase = '••••••••') => {
     try {
+      const blob = readSealedVault();
+      if (blob) await ipcOpenVault(passphrase, blob);
       const payload = await ipcUnlockVaultSolos(passphrase);
       set((state) => ({
         screen: 'desktop',
@@ -363,7 +367,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
             timestamp: nowTimeLabel(),
             event: `Unsealed vault.solos for ${payload.identity} (${ROOM_CONFIGS[state.activeRoom].label})`,
             room: state.activeRoom,
-            cipher: 'ML-KEM-1024',
+            cipher: 'XChaCha20-Poly1305',
           },
           ...state.auditLogs.slice(0, 14),
         ],
@@ -388,7 +392,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
           timestamp: nowTimeLabel(),
           event: 'Sealed vault.solos enclave & zeroed ephemeral session buffers',
           room: state.activeRoom,
-          cipher: 'ML-KEM-1024',
+          cipher: 'XChaCha20-Poly1305',
         },
         ...state.auditLogs.slice(0, 14),
       ],
@@ -416,7 +420,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
           timestamp: nowTimeLabel(),
           event: `Quantum Transaction Shield ${!state.vault.shieldActive ? 'ENABLED' : 'PAUSED'}`,
           room: state.activeRoom,
-          cipher: 'ML-KEM-1024',
+          cipher: 'XChaCha20-Poly1305',
         },
         ...state.auditLogs.slice(0, 14),
       ],
@@ -453,7 +457,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
           timestamp: nowTimeLabel(),
           event: `Switched isolated namespace -> ${ROOM_CONFIGS[room].label} (${payload.keyIsolationId})`,
           room,
-          cipher: 'ML-KEM-1024',
+          cipher: 'XChaCha20-Poly1305',
         },
         ...state.auditLogs.slice(0, 14),
       ],
@@ -656,7 +660,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
           timestamp: nowTimeLabel(),
           event: `Cloned isolated ${targetApp} container bound to ${ROOM_CONFIGS[targetRoom].label}`,
           room: targetRoom,
-          cipher: 'ML-KEM-1024',
+          cipher: 'XChaCha20-Poly1305',
         },
         ...state.auditLogs.slice(0, 14),
       ],

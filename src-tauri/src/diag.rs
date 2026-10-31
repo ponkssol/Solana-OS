@@ -52,3 +52,23 @@ pub fn diag_log(message: String) {
     let message: String = message.chars().take(400).collect();
     write(&format!("ui: {message}"));
 }
+
+const VIEW_BYTES: u64 = 256 * 1024;
+
+#[tauri::command]
+pub fn read_diag_log() -> Result<String, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let path = LOG
+        .lock()
+        .unwrap_or_else(|err| err.into_inner())
+        .as_ref()
+        .map(|(path, _)| path.clone())
+        .ok_or("The log file isn't open")?;
+    let mut file = File::open(&path).map_err(|err| err.to_string())?;
+    let len = file.metadata().map_err(|err| err.to_string())?.len();
+    file.seek(SeekFrom::Start(len.saturating_sub(VIEW_BYTES)))
+        .map_err(|err| err.to_string())?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).map_err(|err| err.to_string())?;
+    Ok(format!("{}\n{}", path.display(), String::from_utf8_lossy(&bytes)))
+}

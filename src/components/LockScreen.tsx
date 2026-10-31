@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { ipcDiagLog } from '../lib/tauriIpc';
 import { useOSStore } from '../store/useOSStore';
 import { BRAND_ASSETS } from '../tokens/designTokens';
-import { WALLPAPER, WIFI_ICON } from './macosMaterials';
+import { WIFI_ICON } from './macosMaterials';
+import { usePrefs, wallpaperCss } from '../lib/settings';
+import { readSealedVault } from '../lib/vaultBlob';
+import { Onboarding } from './Onboarding';
 
 export const LockScreen: React.FC = () => {
   // Lands in solana-os.log next to the backend input probe, to tell a click that never
@@ -19,29 +22,32 @@ export const LockScreen: React.FC = () => {
 
   const { unlockVault, setScreen } = useOSStore();
   const identity = useOSStore((state) => state.vault.identity);
-  const [passphrase, setPassphrase] = useState('solana');
+  const [passphrase, setPassphrase] = useState('');
   const [sheet, setSheet] = useState<'restore' | 'create' | 'recovery' | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [onboarding, setOnboarding] = useState(() => !readSealedVault());
+  const wallpaper = usePrefs((state) => wallpaperCss(state));
+  const now = new Date();
 
   const unlock = async () => {
     if (busy) return;
     setBusy(true);
     setError('');
-    const ok = await unlockVault(passphrase.trim() || 'passkey-mlkem1024');
+    const ok = await unlockVault(passphrase);
     if (!ok) setError("Couldn't unlock vault.solos. Check the passphrase and try again.");
     setBusy(false);
   };
 
   return (
     <div className="relative h-full w-full overflow-hidden text-white select-none">
-      <img src={WALLPAPER} alt="" className="absolute inset-0 size-full scale-110 object-cover blur-[28px]" />
+      <div className="absolute inset-0 scale-110 blur-[28px]" style={{ background: wallpaper }} />
       <div className="absolute inset-0 bg-black/25" />
 
       <div className="absolute right-[18px] top-[10px] flex items-center gap-3 text-[12px] font-[590]">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[11px]">
           <span className="size-1.5 rounded-full bg-[#14f195]" />
-          On-Chain Verified · ML-KEM-1024
+          Argon2id · XChaCha20-Poly1305
         </span>
         <span>100%</span>
         <img src={WIFI_ICON} alt="" className="h-[16px] w-[28px]" />
@@ -56,8 +62,8 @@ export const LockScreen: React.FC = () => {
           draggable={false}
           className="mx-auto mb-3 block h-auto w-[min(240px,46vw)]"
         />
-        <div className="text-[15px] font-[510] text-white/90">Thursday, October 29</div>
-        <div className="os-clock text-[length:var(--os-type-clock)] leading-none tracking-[-0.04em]">01:14</div>
+        <div className="text-[15px] font-[510] text-white/90">{now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+        <div className="os-clock text-[length:var(--os-type-clock)] leading-none tracking-[-0.04em]">{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</div>
       </div>
 
       <form
@@ -91,7 +97,7 @@ export const LockScreen: React.FC = () => {
             Restore vault.solos
           </button>
           <span>·</span>
-          <button type="button" onClick={() => setSheet('create')}>
+          <button type="button" onClick={() => setOnboarding(true)}>
             Create account
           </button>
         </div>
@@ -108,6 +114,8 @@ export const LockScreen: React.FC = () => {
         </button>
       </div>
 
+      {onboarding && <Onboarding onDone={() => setOnboarding(false)} />}
+
       {sheet && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40" onClick={() => setSheet(null)}>
           <div
@@ -122,15 +130,11 @@ export const LockScreen: React.FC = () => {
             </h2>
             <p className="mb-4 text-[11px] leading-[14px] text-white/70">
               {sheet === 'recovery'
-                ? 'Enter the recovery phrase on a new machine. The daily PIN still unwraps the container with Argon2id.'
-                : 'Unseal the portable container. The ML-KEM shared secret stays in the signing enclave.'}
+                ? 'Restoring from the 24-word phrase is not available in this build yet. Keep your written copy safe.'
+                : 'Restoring from a portable container is not available yet. Create a new vault or unlock this one with its passphrase.'}
             </p>
-            <button
-              type="button"
-              onClick={() => void unlock()}
-              className="os-btn os-btn-primary w-full"
-            >
-              {busy ? 'Unsealing…' : 'Continue'}
+            <button type="button" onClick={() => setSheet(null)} className="os-btn os-btn-primary w-full">
+              OK
             </button>
           </div>
         </div>

@@ -4,8 +4,8 @@ import { BRAND_ASSETS } from '../tokens/designTokens';
 
 const BOOT_STEPS: { at: number; label: string }[] = [
   { at: 8, label: 'Initializing Solana OS Microkernel • SVM Enclave Core' },
-  { at: 36, label: 'Verifying Post-Quantum Lattice Keys • ML-KEM-1024' },
-  { at: 62, label: 'Mounting vault.solos • ML-KEM-1024 Enclave' },
+  { at: 36, label: 'Checking vault.solos container' },
+  { at: 62, label: 'Mounting vault.solos' },
   { at: 84, label: 'Isolating Room Namespaces (Main • Degen • Dev • Burner)' },
   { at: 100, label: 'Handing off to the Lock Screen' },
 ];
