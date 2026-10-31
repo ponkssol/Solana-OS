@@ -1099,7 +1099,7 @@ mod win {
                 Err(err) => err.into_inner(),
             };
             jobs.iter()
-                .filter(|(_, job)| !job.exited && !process_alive(job.root_pid))
+                .filter(|(_, job)| !job.exited && !instance_alive(job))
                 .map(|(id, _)| id.clone())
                 .collect()
         };
@@ -1126,6 +1126,15 @@ mod win {
                 }
             }
         }
+    }
+
+    // Launchers such as Discord's Update.exe exit right after spawning the real app,
+    // so the instance lives as long as anything is left in its job.
+    fn instance_alive(job: &JobRec) -> bool {
+        if job.handle_bits != 0 && !job_pids(bits_handle(job.handle_bits)).is_empty() {
+            return true;
+        }
+        process_alive(job.root_pid)
     }
 
     fn process_alive(pid: u32) -> bool {

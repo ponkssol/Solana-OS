@@ -22,14 +22,11 @@ export function HostedApps() {
 
   useEffect(() => {
     if (!isTauriRuntime()) return;
-    let unlisten: (() => void) | undefined;
-    void listen<ContainmentEvent>('containment-window', (event) => {
+    const pending = listen<ContainmentEvent>('containment-window', (event) => {
       useOSStore.getState().applyContainmentEvent(event.payload);
-    }).then((stop) => {
-      unlisten = stop;
     });
     return () => {
-      unlisten?.();
+      void pending.then((stop) => stop());
     };
   }, []);
 
