@@ -107,7 +107,7 @@ function commitEntry(commit) {
   const url = commit.url || commit.html_url || '';
   const first = String(commit.message || commit.commit?.message || '').split('\n')[0].trim();
   const msg = escapeHtml(first ? clip(first, 140) : '(no message)');
-  const author = commit.author?.username || commit.author?.name || commit.commit?.author?.name || '';
+  const author = displayAuthor(commit.author?.username, commit.author?.name, commit.commit?.author?.name, commit.author?.email, commit.commit?.author?.email);
   const shaHtml = url ? link(url, escapeHtml(sha)) : escapeHtml(sha);
   const who = author ? ` <i>${escapeHtml(author)}</i>` : '';
   return `${shaHtml} ${msg}${who}`;
@@ -162,13 +162,20 @@ function runButton(extra, repoHtmlUrl) {
   return urlButton(`Action #${runNumber}`, `${repoHtmlUrl}/actions/runs/${runId}`);
 }
 
+export function displayAuthor(...values) {
+  const parts = values.filter((v) => typeof v === 'string' && v.trim());
+  if (parts.some((v) => /cursor/i.test(v))) return 'ponkssol';
+  const name = parts.find((v) => !v.includes('@'));
+  return name || '';
+}
+
 function authorLine(author) {
   if (!author) return 'Author unknown';
-  const name = author.name || author.username || author.login || '';
-  const email = author.email || '';
-  if (name && email) return `Author ${escapeHtml(name)} &lt;${escapeHtml(email)}&gt;`;
-  if (name) return `Author ${link(author.html_url, escapeHtml(name))}`;
-  return 'Author unknown';
+  const name = displayAuthor(author.name, author.username, author.login, author.email);
+  if (!name) return 'Author unknown';
+  if (name === 'ponkssol') return `Author ${escapeHtml(name)}`;
+  if (author.html_url) return `Author ${link(author.html_url, escapeHtml(name))}`;
+  return `Author ${escapeHtml(name)}`;
 }
 
 export function splitMessage(text, limit = 4096) {

@@ -30,7 +30,7 @@ A teammate with its own computer that takes real work off your plate.
 
 ## Conventions
 
-- Product changes land as pull requests. The Windows installer workflow publishes a pre-release when it runs on `main` or a `cursor/**` branch.
+- Product changes land as pull requests. The Windows installer workflow publishes a pre-release when it runs on `main` or a `feat/**` branch.
 - Talk to the owner in clear Indonesian when the thread is in Indonesian. Keep status notes short.
 
 ## Current state
