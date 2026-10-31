@@ -6,6 +6,7 @@ import { TopMenuBar } from './components/TopMenuBar';
 import { WindowManager } from './components/WindowManager';
 import { FloatingDock } from './components/FloatingDock';
 import { Spotlight } from './components/Spotlight';
+import { Launchpad } from './components/Launchpad';
 import { NotificationStack } from './components/NotificationStack';
 import { WALLPAPER } from './components/macosMaterials';
 import { SystemSettingsModal } from './components/SystemSettingsModal';
@@ -17,6 +18,7 @@ export const App: React.FC = () => {
     lockVault,
     spotlightOpen,
     setSpotlightOpen,
+    launchpadOpen,
     displayBrightness,
     settingsOpen,
     setSettingsOpen,
@@ -68,6 +70,7 @@ export const App: React.FC = () => {
       <FloatingDock />
       {settingsOpen && <SystemSettingsModal onClose={() => setSettingsOpen(false)} />}
       {spotlightOpen && <Spotlight />}
+      {launchpadOpen && <Launchpad />}
     </div>
   );
 };

@@ -18,14 +18,18 @@ export const LockScreen: React.FC = () => {
   }, []);
 
   const { unlockVault, setScreen } = useOSStore();
+  const identity = useOSStore((state) => state.vault.identity);
   const [passphrase, setPassphrase] = useState('solana');
   const [sheet, setSheet] = useState<'restore' | 'create' | 'recovery' | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   const unlock = async () => {
     if (busy) return;
     setBusy(true);
-    await unlockVault(passphrase.trim() || 'passkey-mlkem1024');
+    setError('');
+    const ok = await unlockVault(passphrase.trim() || 'passkey-mlkem1024');
+    if (!ok) setError("Couldn't unlock vault.solos. Check the passphrase and try again.");
     setBusy(false);
   };
 
@@ -66,7 +70,8 @@ export const LockScreen: React.FC = () => {
         <div className="mb-3 flex size-[64px] items-center justify-center rounded-full border border-white/[0.06] bg-[#1a1030]">
           <img src={BRAND_ASSETS.emblemOnlyWhite} alt="" className="h-8 w-auto" />
         </div>
-        <div className="mb-3 text-[13px] font-[590]">nanda.solos</div>
+        <div className="mb-3 text-[13px] font-[590]">{identity || 'vault.solos'}</div>
+        {error && <div className="mb-2 max-w-[260px] text-center text-[12px] text-[#ff6961]">{error}</div>}
         <div
           className="flex h-[26px] w-full items-center rounded-full border border-white/[0.06] bg-white/10 px-3"
         >

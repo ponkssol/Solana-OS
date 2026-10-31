@@ -1,4 +1,7 @@
 export function BentoControlCenter({
+  identity,
+  roomLabel,
+  runningApps,
   shieldOn,
   freezeOn,
   brightness,
@@ -9,6 +12,9 @@ export function BentoControlCenter({
   onVolume,
   onLock,
 }: {
+  identity: string;
+  roomLabel: string;
+  runningApps: number;
   shieldOn: boolean;
   freezeOn: boolean;
   brightness: number;
@@ -29,7 +35,7 @@ export function BentoControlCenter({
           <div className="text-[13px] font-[700] leading-[16px] text-[#f5f5f5] [mix-blend-mode:plus-lighter]">
             Control Center
           </div>
-          <div className="text-[11px] font-[510] leading-[14px] text-[#8a8a8a]">nanda.solos · Main</div>
+          <div className="text-[11px] font-[510] leading-[14px] text-[#8a8a8a]">{identity || 'vault.solos'} · {roomLabel}</div>
         </div>
         <button
           type="button"
@@ -41,10 +47,10 @@ export function BentoControlCenter({
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <ToggleCard label="Helius RPC" detail="11ms" on />
+        <ToggleCard label="RPC" detail="Not configured" on={false} />
         <ToggleCard label="Anti-Drainer" detail={shieldOn ? 'CPI Guard ON' : 'Off'} on={shieldOn} onClick={onToggleShield} />
-        <ToggleCard label="Freeze" detail={freezeOn ? 'SIGSTOP' : 'Off'} on={freezeOn} onClick={onToggleFreeze} />
-        <ToggleCard label="Clipboard" detail="Isolated" on />
+        <ToggleCard label="Freeze" detail={freezeOn ? 'All apps paused' : 'Off'} on={freezeOn} onClick={onToggleFreeze} />
+        <ToggleCard label="Apps" detail={`${runningApps} running`} on={runningApps > 0} />
       </div>
 
       <div className="mt-2 space-y-2">

@@ -26,8 +26,12 @@ export function TerminalWindow({ roomId = 'treasury' }: { roomId?: string }) {
       setDraft('');
       return;
     }
-    const result = await runSandboxedCliCommand(roomId, shell, text);
-    setLines((prev) => [...prev, `${result.prompt} ${text}`, result.output].filter((line) => line.length > 0));
+    try {
+      const result = await runSandboxedCliCommand(roomId, shell, text);
+      setLines((prev) => [...prev, `${result.prompt} ${text}`, result.output].filter((line) => line.length > 0));
+    } catch (error) {
+      setLines((prev) => [...prev, `> ${text}`, String(error)]);
+    }
     setDraft('');
   };
 

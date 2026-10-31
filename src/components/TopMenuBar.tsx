@@ -3,6 +3,7 @@ import { useOSStore, WindowId } from '../store/useOSStore';
 import { BentoControlCenter } from './BentoControlCenter';
 import { CONTROL_CENTER_ICON, WIFI_ICON } from './macosMaterials';
 import { ipcMinimizeShell } from '../lib/tauriIpc';
+import { ROOM_CONFIGS } from '../tokens/designTokens';
 
 const MENUS: { label: string; windowId?: WindowId; heavy?: boolean }[] = [
   { label: 'Solana OS', heavy: true },
@@ -30,6 +31,8 @@ export const TopMenuBar: React.FC = () => {
     openWindow: openApp,
     shellMode,
     toggleShellMode,
+    hosted,
+    activeRoom,
   } = useOSStore();
   const [controlOpen, setControlOpen] = useState(false);
   const [volume, setVolume] = useState(68);
@@ -63,8 +66,8 @@ export const TopMenuBar: React.FC = () => {
 
       <div className="flex items-center">
         <span className="mr-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-[590]">
-          <span className="size-1.5 rounded-full bg-[#14f195]" />
-          Helius RPC · 11ms
+          <span className="size-1.5 rounded-full bg-[#8e8e93]" />
+          RPC not configured
         </span>
         <button type="button" aria-label="Spotlight" onClick={() => setSpotlightOpen(true)} className="px-[9px] py-[4px] text-[13px]">
           ⌕
@@ -77,12 +80,15 @@ export const TopMenuBar: React.FC = () => {
           {controlOpen && (
             <div className="absolute right-0 top-[28px]">
               <BentoControlCenter
+                identity={vault.identity}
+                roomLabel={ROOM_CONFIGS[activeRoom].label}
+                runningApps={new Set(hosted.map((win) => win.instanceId)).size}
                 shieldOn={vault.shieldActive}
                 freezeOn={processFreezeActive}
                 brightness={displayBrightness}
                 volume={volume}
                 onToggleShield={toggleShield}
-                onToggleFreeze={toggleProcessFreeze}
+                onToggleFreeze={() => void toggleProcessFreeze()}
                 onBrightness={setDisplayBrightness}
                 onVolume={setVolume}
                 onLock={() => {

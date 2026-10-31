@@ -1,6 +1,8 @@
-import { BRAND_ASSETS } from '../tokens/designTokens';
+import { useOSStore } from '../store/useOSStore';
+import { BRAND_ASSETS, ROOM_CONFIGS } from '../tokens/designTokens';
 
 export function SystemSettingsModal({ onClose }: { onClose: () => void }) {
+  const { vault, activeRoom } = useOSStore();
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" onClick={onClose}>
       <section
@@ -32,10 +34,11 @@ export function SystemSettingsModal({ onClose }: { onClose: () => void }) {
               Done
             </button>
           </div>
-          <SettingsRow label="Active room" value="Main Treasury" />
-          <SettingsRow label="RPC" value="Helius staked · 11ms" />
-          <SettingsRow label="Cipher" value="ML-KEM-1024 + XChaCha20-Poly1305" />
-          <SettingsRow label="Wallpaper" value="Figma dark wave · 5fffa-1920" />
+          <SettingsRow label="Identity" value={vault.identity || 'Not unlocked'} />
+          <SettingsRow label="Active room" value={ROOM_CONFIGS[activeRoom].label} />
+          <SettingsRow label="Vault" value={vault.locked ? 'Locked' : `Unlocked · ${vault.cipherSuite}`} />
+          <SettingsRow label="Key isolation ID" value={vault.keyIsolationId} />
+          <SettingsRow label="RPC" value="Not configured" />
           <p className="mt-4 text-[12px] leading-5 text-[#8a8a8a]">
             Room namespaces keep AppData, the Solana CLI config, and the vault mount separate.
             Theme stays on the dark macOS hairline system.
