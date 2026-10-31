@@ -1,13 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import {
   cloneAppInstance,
   getEnclaveStatus,
+  markSandboxExited,
   signWithRamEnclave,
   simulateSolanaTx,
   terminateSandbox,
   toggleFreezeProcess,
   type SandboxInstance,
 } from '../lib/tauriBridge';
+import { isTauriRuntime, type ContainmentEvent } from '../lib/tauriIpc';
 import { OSWindow, useOSStore, WindowId } from '../store/useOSStore';
 import { MacOSDialogModal } from './MacOSDialogModal';
 import { SidebarVibrancy, Stoplights } from './macosMaterials';
@@ -63,6 +66,16 @@ export const WindowManager: React.FC = () => {
 
   useEffect(() => {
     void getEnclaveStatus().then((status) => setRows(status.sandboxes));
+  }, []);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    const pending = listen<ContainmentEvent>('containment-window', (event) => {
+      if (event.payload.kind === 'exited') setRows(markSandboxExited(event.payload.instanceId).sandboxes);
+    });
+    return () => {
+      void pending.then((stop) => stop());
+    };
   }, []);
 
   useEffect(() => {
