@@ -33,12 +33,7 @@ export interface HostedAppWindow {
   appName: string;
   roomId: string;
   primary: boolean;
-  embedded: boolean;
   isMinimized: boolean;
-  isMaximized: boolean;
-  zIndex: number;
-  position: { x: number; y: number };
-  size: { width: number; height: number };
 }
 
 export interface OSWindow {
@@ -120,11 +115,6 @@ interface OSStoreState {
   applyContainmentEvent: (event: ContainmentEvent) => void;
   focusHosted: (key: string) => string | null;
   focusHostedInstance: (instanceId: string) => string | null;
-  minimizeHosted: (key: string) => void;
-  toggleMaximizeHosted: (key: string) => void;
-  moveHosted: (key: string, x: number, y: number) => void;
-  resizeHosted: (key: string, width: number, height: number) => void;
-  removeHosted: (key: string) => void;
   removeHostedInstance: (instanceId: string) => void;
   toggleShellMode: () => Promise<void>;
   spawnClonedInstance: (targetApp: string, targetRoom: RoomId) => void;
@@ -504,10 +494,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
   openHostedApp: (seed) =>
     set((state) => {
       if (state.hosted.some((win) => win.instanceId === seed.instanceId)) return state;
-      const nextZ = state.topZIndex + 1;
-      const frame = hostedFrame(state.hosted.length);
       return {
-        topZIndex: nextZ,
         hosted: [
           ...state.hosted,
           {
@@ -518,12 +505,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
             appName: seed.appName,
             roomId: seed.roomId,
             primary: true,
-            embedded: false,
             isMinimized: false,
-            isMaximized: false,
-            zIndex: nextZ,
-            position: { x: frame.x, y: frame.y },
-            size: { width: frame.width, height: frame.height },
           },
         ],
       };
@@ -544,12 +526,18 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
           ),
         };
       }
+      if (event.kind === 'minimized' || event.kind === 'restored') {
+        const isMinimized = event.kind === 'minimized';
+        return {
+          hosted: state.hosted.map((win) => (win.hwnd === event.hwnd ? { ...win, isMinimized } : win)),
+        };
+      }
       const existing = state.hosted.find((win) => win.hwnd === event.hwnd);
       if (existing) {
         return {
           hosted: state.hosted.map((win) =>
             win.key === existing.key
-              ? { ...win, title: event.title || win.title, embedded: event.embedded, primary: event.primary || win.primary }
+              ? { ...win, title: event.title || win.title, isMinimized: false, primary: event.primary || win.primary }
               : win,
           ),
         };
@@ -566,17 +554,13 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
                   title: event.title || win.title,
                   appName: event.appName || win.appName,
                   roomId: event.roomId || win.roomId,
-                  embedded: event.embedded,
                   primary: true,
                 }
               : win,
           ),
         };
       }
-      const nextZ = state.topZIndex + 1;
-      const frame = hostedFrame(state.hosted.length);
       return {
-        topZIndex: nextZ,
         hosted: [
           ...state.hosted,
           {
@@ -587,12 +571,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
             appName: event.appName,
             roomId: event.roomId,
             primary: event.primary,
-            embedded: event.embedded,
             isMinimized: false,
-            isMaximized: false,
-            zIndex: nextZ,
-            position: { x: frame.x, y: frame.y },
-            size: { width: frame.width, height: frame.height },
           },
         ],
       };
@@ -601,12 +580,8 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
   focusHosted: (key) => {
     const win = get().hosted.find((item) => item.key === key);
     if (!win) return null;
-    const nextZ = get().topZIndex + 1;
     set((state) => ({
-      topZIndex: nextZ,
-      hosted: state.hosted.map((item) =>
-        item.key === key ? { ...item, isMinimized: false, zIndex: nextZ } : item,
-      ),
+      hosted: state.hosted.map((item) => (item.key === key ? { ...item, isMinimized: false } : item)),
     }));
     return win.hwnd;
   },
@@ -617,42 +592,6 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
     if (!win) return null;
     return get().focusHosted(win.key);
   },
-
-  minimizeHosted: (key) =>
-    set((state) => ({
-      hosted: state.hosted.map((item) => (item.key === key ? { ...item, isMinimized: true, isMaximized: false } : item)),
-    })),
-
-  toggleMaximizeHosted: (key) =>
-    set((state) => {
-      const nextZ = state.topZIndex + 1;
-      return {
-        topZIndex: nextZ,
-        hosted: state.hosted.map((item) =>
-          item.key === key ? { ...item, isMaximized: !item.isMaximized, isMinimized: false, zIndex: nextZ } : item,
-        ),
-      };
-    }),
-
-  moveHosted: (key, x, y) =>
-    set((state) => ({
-      hosted: state.hosted.map((item) => {
-        if (item.key !== key || item.isMaximized) return item;
-        const frame = clampHosted(x, y, item.size.width, item.size.height);
-        return { ...item, position: { x: frame.x, y: frame.y } };
-      }),
-    })),
-
-  resizeHosted: (key, width, height) =>
-    set((state) => ({
-      hosted: state.hosted.map((item) => {
-        if (item.key !== key || item.isMaximized) return item;
-        const frame = clampHosted(item.position.x, item.position.y, width, height);
-        return { ...item, position: { x: frame.x, y: frame.y }, size: { width: frame.width, height: frame.height } };
-      }),
-    })),
-
-  removeHosted: (key) => set((state) => ({ hosted: state.hosted.filter((item) => item.key !== key) })),
 
   removeHostedInstance: (instanceId) =>
     set((state) => ({ hosted: state.hosted.filter((item) => item.instanceId !== instanceId) })),
@@ -746,18 +685,3 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
     }));
   },
 }));
-
-function hostedFrame(index: number) {
-  return clampHosted(72 + (index % 5) * 28, 52 + (index % 5) * 24, 960, 620);
-}
-
-function clampHosted(x: number, y: number, width: number, height: number) {
-  if (typeof window === 'undefined') return { x, y, width, height };
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const nextWidth = Math.max(360, Math.min(width, vw - 24));
-  const nextHeight = Math.max(240, Math.min(height, vh - 120));
-  const left = Math.min(Math.max(8, x), Math.max(8, vw - nextWidth - 8));
-  const top = Math.min(Math.max(36, y), Math.max(36, vh - nextHeight - 80));
-  return { x: left, y: top, width: nextWidth, height: nextHeight };
-}

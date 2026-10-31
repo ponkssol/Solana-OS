@@ -1,24 +1,20 @@
 //! Keeps apps launched on the interactive desktop inside the Solana OS shell.
 //!
-//! `WS_EX_NOREDIRECTIONBITMAP` windows (Chrome, Electron) paint blank if they are
-//! reparented, so those stay owned top-level windows clamped to the shell frame.
-//! Other top-level windows become children of a host HWND under the shell.
-//! Small popups are clamped in place and do not get their own shell frame.
+//! App windows stay real top-level windows that draw and move themselves; they are owned
+//! by the shell (so they never get a taskbar button) and are only clamped back into the
+//! shell desk area when they leave it. Small popups are clamped the same way.
 
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
-
-pub const EX_NOREDIRECTIONBITMAP: u32 = 0x0020_0000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CaptureClass {
     Ignore,
     Transient,
-    OwnedFrame,
-    Embed,
+    Frame,
 }
 
-pub fn classify_window(class_name: &str, ex_style: u32, width: i32, height: i32) -> CaptureClass {
+pub fn classify_window(class_name: &str, width: i32, height: i32) -> CaptureClass {
     if skip_window_class(class_name) {
         return CaptureClass::Ignore;
     }
@@ -32,11 +28,7 @@ pub fn classify_window(class_name: &str, ex_style: u32, width: i32, height: i32)
     if width < 280 || height < 160 {
         return CaptureClass::Transient;
     }
-    if ex_style & EX_NOREDIRECTIONBITMAP != 0 {
-        CaptureClass::OwnedFrame
-    } else {
-        CaptureClass::Embed
-    }
+    CaptureClass::Frame
 }
 
 pub fn skip_window_class(class_name: &str) -> bool {
@@ -49,7 +41,6 @@ pub fn skip_window_class(class_name: &str) -> bool {
             | "msctfime ui"
             | "cicerouiwnframe"
             | "internet explorer_hidden"
-            | "solanaos_host"
             | "progman"
             | "shell_traywnd"
             | "workerw"
@@ -68,21 +59,17 @@ struct ContainmentEvent {
     hwnd: String,
     title: String,
     primary: bool,
-    embedded: bool,
     app_name: String,
     room_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct HostSlot {
-    pub hwnd: String,
+pub struct DeskArea {
     pub x: i32,
     pub y: i32,
     pub width: i32,
     pub height: i32,
-    pub visible: bool,
-    pub raise: bool,
 }
 
 pub fn install(app: &AppHandle) {
@@ -100,6 +87,17 @@ pub fn nudge() {
     #[cfg(windows)]
     {
         win::post(win::Command::Raise);
+    }
+}
+
+pub fn bring_to_front(hwnd_bits: isize) {
+    #[cfg(windows)]
+    {
+        win::force_foreground(windows::Win32::Foundation::HWND(hwnd_bits as *mut _));
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = hwnd_bits;
     }
 }
 
@@ -128,14 +126,14 @@ pub fn enroll(
 }
 
 #[tauri::command]
-pub fn containment_set_slot(slot: HostSlot) -> Result<(), String> {
+pub fn containment_set_desk(desk: DeskArea) -> Result<(), String> {
     #[cfg(windows)]
     {
-        win::post(win::Command::Slot(slot));
+        win::post(win::Command::Desk(desk));
     }
     #[cfg(not(windows))]
     {
-        let _ = slot;
+        let _ = desk;
     }
     Ok(())
 }
@@ -168,55 +166,49 @@ pub fn containment_close_window(hwnd: String) -> Result<(), String> {
 
 #[cfg(windows)]
 mod win {
-    use super::{classify_window, ContainmentEvent, HostSlot, CaptureClass};
+    use super::{classify_window, CaptureClass, ContainmentEvent, DeskArea};
     use std::collections::{HashMap, VecDeque};
-    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-    use std::sync::{mpsc, LazyLock, Mutex, OnceLock};
+    use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
+    use std::sync::{mpsc, LazyLock, Mutex};
     use std::time::{Duration, Instant};
     use tauri::{AppHandle, Emitter, Manager};
 
     use windows::core::PCWSTR;
-    use windows::Win32::Foundation::{
-        CloseHandle, BOOL, HINSTANCE, HMODULE, HWND, LPARAM, LRESULT, RECT, WPARAM,
-    };
+    use windows::Win32::Foundation::{CloseHandle, BOOL, HMODULE, HWND, LPARAM, RECT, WPARAM};
     use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
-    use windows::Win32::Graphics::Gdi::{
-        CombineRgn, CreateRectRgn, DeleteObject, GetStockObject, BLACK_BRUSH, HBRUSH, HRGN, RGN_DIFF,
-        ClientToScreen, ScreenToClient, SetWindowRgn,
-    };
+    use windows::Win32::Graphics::Gdi::ClientToScreen;
     use windows::Win32::System::JobObjects::{
         AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
         SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
         JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
     };
-    use windows::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows::Win32::System::Threading::{
         AttachThreadInput, GetCurrentThreadId, GetExitCodeProcess, OpenProcess,
         PROCESS_QUERY_LIMITED_INFORMATION,
     };
     use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
     use windows::Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EnumWindows, GetAncestor,
-        GetClassNameW, GetClientRect, GetForegroundWindow, GetParent, GetWindow, GetWindowLongPtrW,
-        GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsWindow, IsWindowVisible,
-        MoveWindow, MsgWaitForMultipleObjects, PeekMessageW, PostMessageW, PostThreadMessageW,
-        RegisterClassW, SetForegroundWindow, SetParent, SetWindowLongPtrW, SetWindowPos, ShowWindow,
-        TranslateMessage, EVENT_OBJECT_CREATE, EVENT_OBJECT_DESTROY, EVENT_OBJECT_HIDE,
+        BringWindowToTop, DispatchMessageW, EnumWindows, GetAncestor, GetClassNameW, GetClientRect,
+        GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowRect, GetWindowTextW,
+        GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, IsZoomed, MsgWaitForMultipleObjects,
+        PeekMessageW, PostMessageW, PostThreadMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
+        ShowWindow, TranslateMessage, EVENT_OBJECT_CREATE, EVENT_OBJECT_DESTROY, EVENT_OBJECT_HIDE,
         EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_NAMECHANGE, EVENT_OBJECT_SHOW, GA_ROOT, GET_WINDOW_CMD,
-        GWL_EXSTYLE, GWL_STYLE, GWLP_HWNDPARENT, GW_CHILD, GW_HWNDNEXT, GW_HWNDPREV, HMENU,
-        HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST, MSG, PM_NOREMOVE, PM_REMOVE, QS_ALLINPUT,
-        SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW, SW_HIDE,
-        SW_SHOWNA, WINDOW_EX_STYLE, WINDOW_STYLE, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
-        WNDCLASSW, WM_CLOSE, WM_DESTROY, WM_QUIT, WM_SIZE, WS_BORDER, WS_CAPTION, WS_CHILD,
-        WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_DLGFRAME, WS_EX_APPWINDOW, WS_EX_DLGMODALFRAME,
-        WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP,
-        WS_SYSMENU, WS_THICKFRAME,
+        GWL_EXSTYLE, GWL_STYLE, GWLP_HWNDPARENT, GW_HWNDPREV, HWND_NOTOPMOST, HWND_TOPMOST, MSG,
+        PM_NOREMOVE, PM_REMOVE, QS_ALLINPUT, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE,
+        SWP_NOZORDER, SW_HIDE, SW_RESTORE, WINDOW_EX_STYLE, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
+        WM_CLOSE, WM_QUIT, WS_CHILD, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
     };
 
     const EVENT_OBJECT_UNCLOAKED: u32 = 0x8018;
+    const EVENT_SYSTEM_MOVESIZESTART: u32 = 0x000A;
+    const EVENT_SYSTEM_MOVESIZEEND: u32 = 0x000B;
+    const EVENT_SYSTEM_MINIMIZESTART: u32 = 0x0016;
+    const EVENT_SYSTEM_MINIMIZEEND: u32 = 0x0017;
     const STILL_ACTIVE: u32 = 259;
     static HOOK_THREAD: AtomicU32 = AtomicU32::new(0);
-    static CLASS_READY: AtomicBool = AtomicBool::new(false);
+    // The window inside a native move/size loop; clamping it mid-drag fights the loop and flickers.
+    static DRAGGING: AtomicIsize = AtomicIsize::new(0);
 
     struct JobRec {
         handle_bits: isize,
@@ -229,27 +221,16 @@ mod win {
 
     #[derive(Clone, Copy, PartialEq, Eq)]
     enum Kind {
-        Embed,
-        Owned,
+        Frame,
         Transient,
-    }
-
-    struct Slot {
-        x: i32,
-        y: i32,
-        width: i32,
-        height: i32,
-        visible: bool,
-        raise: bool,
     }
 
     struct WinRec {
         instance_id: String,
         kind: Kind,
-        host_bits: isize,
         title: String,
         announced: bool,
-        slot: Option<Slot>,
+        minimized: bool,
     }
 
     struct Runtime {
@@ -257,7 +238,7 @@ mod win {
         app: AppHandle,
         windows: HashMap<isize, WinRec>,
         commands: VecDeque<Command>,
-        region_sig: String,
+        desk: Option<DeskArea>,
     }
 
     struct PidCache {
@@ -266,7 +247,7 @@ mod win {
     }
 
     pub enum Command {
-        Slot(HostSlot),
+        Desk(DeskArea),
         Focus(String),
         Close(String),
         Release(String),
@@ -336,7 +317,7 @@ mod win {
                 app: app.clone(),
                 windows: HashMap::new(),
                 commands: VecDeque::new(),
-                region_sig: String::new(),
+                desk: None,
             });
         }
         let (tx, rx) = mpsc::channel();
@@ -427,6 +408,15 @@ mod win {
                 0,
                 WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
             );
+            let _ = SetWinEventHook(
+                EVENT_SYSTEM_MOVESIZESTART,
+                EVENT_SYSTEM_MINIMIZEEND,
+                HMODULE(std::ptr::null_mut()),
+                Some(on_event),
+                0,
+                0,
+                WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+            );
         }
         loop {
             unsafe {
@@ -457,39 +447,11 @@ mod win {
         if id_object != 0 || id_child != 0 || hwnd.0.is_null() {
             return;
         }
+        if (EVENT_SYSTEM_MOVESIZESTART..=EVENT_SYSTEM_MINIMIZEEND).contains(&event) {
+            on_system(hwnd_bits(hwnd), hwnd, event);
+            return;
+        }
         consider(hwnd, event);
-    }
-
-    unsafe extern "system" fn host_wnd_proc(
-        hwnd: HWND,
-        msg: u32,
-        wparam: WPARAM,
-        lparam: LPARAM,
-    ) -> LRESULT {
-        if msg == WM_SIZE {
-            let width = (lparam.0 & 0xffff) as i32;
-            let height = ((lparam.0 >> 16) & 0xffff) as i32;
-            if let Some(child) = child_of_host(hwnd_bits(hwnd)) {
-                let _ = MoveWindow(bits_hwnd(child), 0, 0, width.max(1), height.max(1), true);
-            }
-            return LRESULT(0);
-        }
-        if msg == WM_DESTROY {
-            return LRESULT(0);
-        }
-        DefWindowProcW(hwnd, msg, wparam, lparam)
-    }
-
-    fn child_of_host(host_bits: isize) -> Option<isize> {
-        let guard = RUNTIME.lock().ok()?;
-        let runtime = guard.as_ref()?;
-        runtime.windows.iter().find_map(|(bits, win)| {
-            if win.host_bits == host_bits {
-                Some(*bits)
-            } else {
-                None
-            }
-        })
     }
 
     fn consider(hwnd: HWND, event: u32) {
@@ -519,8 +481,7 @@ mod win {
 
     fn on_tracked(bits: isize, hwnd: HWND, event: u32) {
         if event == EVENT_OBJECT_HIDE && !unsafe { IsWindowVisible(hwnd).as_bool() } {
-            let kind = kind_of(bits);
-            if kind == Some(Kind::Transient) {
+            if kind_of(bits) == Some(Kind::Transient) {
                 forget(bits, false);
             }
             return;
@@ -553,18 +514,57 @@ mod win {
             return;
         }
         if event == EVENT_OBJECT_LOCATIONCHANGE || event == EVENT_OBJECT_SHOW {
-            let (width, height) = window_size(hwnd);
-            let ex = ex_style(hwnd);
-            let class_name = class_name(hwnd);
-            let next = classify_window(&class_name, ex, width, height);
-            let kind = kind_of(bits);
-            if kind == Some(Kind::Transient) && matches!(next, CaptureClass::Embed | CaptureClass::OwnedFrame)
-            {
-                promote(bits, hwnd, next);
-            } else if kind == Some(Kind::Embed) && next == CaptureClass::OwnedFrame {
-                convert_to_owned(bits, hwnd);
+            match kind_of(bits) {
+                Some(Kind::Transient) => {
+                    let (width, height) = window_size(hwnd);
+                    if classify_window(&class_name(hwnd), width, height) == CaptureClass::Frame {
+                        promote(bits, hwnd);
+                    } else {
+                        keep_inside(hwnd);
+                    }
+                }
+                Some(Kind::Frame) if DRAGGING.load(Ordering::SeqCst) != bits => keep_inside(hwnd),
+                _ => {}
             }
         }
+    }
+
+    fn on_system(bits: isize, hwnd: HWND, event: u32) {
+        if kind_of(bits) != Some(Kind::Frame) {
+            return;
+        }
+        match event {
+            EVENT_SYSTEM_MOVESIZESTART => DRAGGING.store(bits, Ordering::SeqCst),
+            EVENT_SYSTEM_MOVESIZEEND => {
+                DRAGGING.store(0, Ordering::SeqCst);
+                keep_inside(hwnd);
+            }
+            EVENT_SYSTEM_MINIMIZESTART => {
+                // A hidden window has no taskbar or desktop icon; the dock restores it.
+                unsafe {
+                    let _ = ShowWindow(hwnd, SW_HIDE);
+                }
+                if set_minimized(bits, true) {
+                    emit_for(bits, "minimized", "");
+                }
+            }
+            EVENT_SYSTEM_MINIMIZEEND => {
+                if set_minimized(bits, false) {
+                    emit_for(bits, "restored", "");
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn set_minimized(bits: isize, minimized: bool) -> bool {
+        let mut guard = RUNTIME.lock().unwrap_or_else(|err| err.into_inner());
+        let Some(win) = guard.as_mut().and_then(|runtime| runtime.windows.get_mut(&bits)) else {
+            return false;
+        };
+        let changed = win.minimized != minimized;
+        win.minimized = minimized;
+        changed && win.announced
     }
 
     fn capturable(hwnd: HWND) -> bool {
@@ -597,8 +597,7 @@ mod win {
     fn capture(hwnd: HWND, instance_id: &str) {
         let (width, height) = window_size(hwnd);
         let class_name = class_name(hwnd);
-        let ex = ex_style(hwnd);
-        let class = classify_window(&class_name, ex, width, height);
+        let class = classify_window(&class_name, width, height);
         if class == CaptureClass::Ignore {
             return;
         }
@@ -613,61 +612,24 @@ mod win {
             hwnd_bits(hwnd),
             class
         );
-        match class {
-            CaptureClass::Transient => {
-                remember(
-                    hwnd,
-                    instance_id,
-                    Kind::Transient,
-                    0,
-                    title,
-                    false,
-                );
-                clamp_transient(hwnd, shell);
-                unsafe {
-                    let _ = ShowWindow(hwnd, SW_SHOWNA);
-                }
+        if class == CaptureClass::Transient {
+            remember(hwnd, instance_id, Kind::Transient, title, false);
+            keep_inside(hwnd);
+            unsafe {
+                let _ = SetWindowPos(hwnd, z_insert(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             }
-            CaptureClass::OwnedFrame => {
-                unsafe {
-                    let _ = ShowWindow(hwnd, SW_HIDE);
-                }
-                let primary = mark_frame(instance_id);
-                remember(hwnd, instance_id, Kind::Owned, 0, title.clone(), true);
-                emit_window(instance_id, hwnd_bits(hwnd), &title, primary, false, "appeared");
-            }
-            CaptureClass::Embed => {
-                unsafe {
-                    let _ = ShowWindow(hwnd, SW_HIDE);
-                }
-                let host = create_host(shell, 0, 0, 1, 1);
-                if let Some(host) = host {
-                    if reparent_into(hwnd, host) {
-                        let primary = mark_frame(instance_id);
-                        remember(
-                            hwnd,
-                            instance_id,
-                            Kind::Embed,
-                            hwnd_bits(host),
-                            title.clone(),
-                            true,
-                        );
-                        emit_window(instance_id, hwnd_bits(hwnd), &title, primary, true, "appeared");
-                        return;
-                    }
-                    unsafe {
-                        let _ = DestroyWindow(host);
-                    }
-                }
-                let primary = mark_frame(instance_id);
-                remember(hwnd, instance_id, Kind::Owned, 0, title.clone(), true);
-                emit_window(instance_id, hwnd_bits(hwnd), &title, primary, false, "appeared");
-            }
-            CaptureClass::Ignore => {}
+            return;
         }
+        let primary = mark_frame(instance_id);
+        remember(hwnd, instance_id, Kind::Frame, title.clone(), true);
+        keep_inside(hwnd);
+        unsafe {
+            let _ = SetWindowPos(hwnd, z_insert(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+        emit_window(instance_id, hwnd_bits(hwnd), &title, primary, "appeared");
     }
 
-    fn promote(bits: isize, hwnd: HWND, class: CaptureClass) {
+    fn promote(bits: isize, hwnd: HWND) {
         let instance_id = {
             let guard = match RUNTIME.lock() {
                 Ok(guard) => guard,
@@ -682,51 +644,10 @@ mod win {
             win.instance_id.clone()
         };
         forget(bits, false);
-        let _ = class;
         capture(hwnd, &instance_id);
     }
 
-    fn convert_to_owned(bits: isize, hwnd: HWND) {
-        let host_bits = {
-            let mut guard = match RUNTIME.lock() {
-                Ok(guard) => guard,
-                Err(err) => err.into_inner(),
-            };
-            let Some(runtime) = guard.as_mut() else {
-                return;
-            };
-            let Some(win) = runtime.windows.get_mut(&bits) else {
-                return;
-            };
-            win.kind = Kind::Owned;
-            let host = win.host_bits;
-            win.host_bits = 0;
-            host
-        };
-        let shell = shell_hwnd();
-        unsafe {
-            let _ = SetParent(hwnd, None);
-            let style = WINDOW_STYLE(GetWindowLongPtrW(hwnd, GWL_STYLE) as u32);
-            let next = (style & !WS_CHILD) | WS_POPUP | WS_CLIPSIBLINGS;
-            SetWindowLongPtrW(hwnd, GWL_STYLE, next.0 as isize);
-        }
-        strip_taskbar(hwnd, shell);
-        if host_bits != 0 {
-            unsafe {
-                let _ = DestroyWindow(bits_hwnd(host_bits));
-            }
-        }
-        emit_for(bits, "appeared", &window_title(hwnd));
-    }
-
-    fn remember(
-        hwnd: HWND,
-        instance_id: &str,
-        kind: Kind,
-        host_bits: isize,
-        title: String,
-        announced: bool,
-    ) {
+    fn remember(hwnd: HWND, instance_id: &str, kind: Kind, title: String, announced: bool) {
         let mut guard = RUNTIME.lock().unwrap_or_else(|err| err.into_inner());
         let Some(runtime) = guard.as_mut() else {
             return;
@@ -736,10 +657,9 @@ mod win {
             WinRec {
                 instance_id: instance_id.to_string(),
                 kind,
-                host_bits,
                 title,
                 announced,
-                slot: None,
+                minimized: false,
             },
         );
     }
@@ -778,20 +698,11 @@ mod win {
         let Some(win) = removed else {
             return;
         };
-        if win.host_bits != 0 {
-            unsafe {
-                let _ = DestroyWindow(bits_hwnd(win.host_bits));
-            }
+        if DRAGGING.load(Ordering::SeqCst) == bits {
+            DRAGGING.store(0, Ordering::SeqCst);
         }
         if announce && win.announced {
-            emit_window(
-                &win.instance_id,
-                bits,
-                &win.title,
-                false,
-                win.kind == Kind::Embed,
-                "destroyed",
-            );
+            emit_window(&win.instance_id, bits, &win.title, false, "destroyed");
         }
     }
 
@@ -807,16 +718,12 @@ mod win {
             let Some(win) = runtime.windows.get(&bits) else {
                 return;
             };
-            (
-                win.instance_id.clone(),
-                win.kind == Kind::Embed,
-                runtime.app.clone(),
-            )
+            (win.instance_id.clone(), runtime.app.clone())
         };
-        emit_with(&snapshot.2, &snapshot.0, bits, title, false, snapshot.1, kind);
+        emit_with(&snapshot.1, &snapshot.0, bits, title, false, kind);
     }
 
-    fn emit_window(instance_id: &str, bits: isize, title: &str, primary: bool, embedded: bool, kind: &str) {
+    fn emit_window(instance_id: &str, bits: isize, title: &str, primary: bool, kind: &str) {
         let app = {
             let guard = match RUNTIME.lock() {
                 Ok(guard) => guard,
@@ -825,7 +732,7 @@ mod win {
             guard.as_ref().map(|runtime| runtime.app.clone())
         };
         if let Some(app) = app {
-            emit_with(&app, instance_id, bits, title, primary, embedded, kind);
+            emit_with(&app, instance_id, bits, title, primary, kind);
         }
     }
 
@@ -835,7 +742,6 @@ mod win {
         bits: isize,
         title: &str,
         primary: bool,
-        embedded: bool,
         kind: &str,
     ) {
         let (app_name, room_id) = job_names(instance_id);
@@ -847,7 +753,6 @@ mod win {
                 hwnd: bits.to_string(),
                 title: title.to_string(),
                 primary,
-                embedded,
                 app_name,
                 room_id,
             },
@@ -874,7 +779,7 @@ mod win {
         };
         for command in commands {
             match command {
-                Command::Slot(slot) => apply_slot(slot),
+                Command::Desk(desk) => set_desk(desk),
                 Command::Focus(hwnd) => focus_hwnd(&hwnd),
                 Command::Close(hwnd) => close_hwnd(&hwnd),
                 Command::Release(id) => drop_instance(&id),
@@ -883,91 +788,17 @@ mod win {
         }
     }
 
-    fn apply_slot(slot: HostSlot) {
-        let Ok(bits) = slot.hwnd.parse::<isize>() else {
-            return;
-        };
-        let (kind, host_bits) = {
-            let mut guard = match RUNTIME.lock() {
-                Ok(guard) => guard,
-                Err(err) => err.into_inner(),
-            };
+    fn set_desk(desk: DeskArea) {
+        let frames: Vec<isize> = {
+            let mut guard = RUNTIME.lock().unwrap_or_else(|err| err.into_inner());
             let Some(runtime) = guard.as_mut() else {
                 return;
             };
-            let Some(win) = runtime.windows.get_mut(&bits) else {
-                return;
-            };
-            win.slot = Some(Slot {
-                x: slot.x,
-                y: slot.y,
-                width: slot.width,
-                height: slot.height,
-                visible: slot.visible,
-                raise: slot.raise,
-            });
-            (win.kind, win.host_bits)
+            runtime.desk = Some(desk);
+            runtime.windows.keys().copied().collect()
         };
-        let shell = shell_hwnd();
-        match kind {
-            Kind::Embed => place_embed(bits_hwnd(host_bits), bits_hwnd(bits), &slot),
-            Kind::Owned => place_owned(bits_hwnd(bits), shell, &slot),
-            Kind::Transient => {}
-        }
-        sync_region();
-        if slot.raise {
-            raise_owned();
-        }
-    }
-
-    fn place_embed(host: HWND, child: HWND, slot: &HostSlot) {
-        if host.0.is_null() {
-            return;
-        }
-        unsafe {
-            let flags = SWP_NOZORDER | SWP_NOACTIVATE;
-            let _ = SetWindowPos(
-                host,
-                HWND_TOP,
-                slot.x,
-                slot.y,
-                slot.width.max(1),
-                slot.height.max(1),
-                flags,
-            );
-            let _ = MoveWindow(child, 0, 0, slot.width.max(1), slot.height.max(1), true);
-            let _ = ShowWindow(host, if slot.visible { SW_SHOWNA } else { SW_HIDE });
-            let _ = ShowWindow(child, if slot.visible { SW_SHOWNA } else { SW_HIDE });
-            if slot.visible {
-                let _ = SetWindowPos(
-                    host,
-                    HWND_TOP,
-                    slot.x,
-                    slot.y,
-                    slot.width.max(1),
-                    slot.height.max(1),
-                    SWP_NOACTIVATE | SWP_SHOWWINDOW,
-                );
-            }
-        }
-    }
-
-    fn place_owned(hwnd: HWND, shell: HWND, slot: &HostSlot) {
-        let Some((x, y)) = client_to_screen(shell, slot.x, slot.y) else {
-            return;
-        };
-        let insert = z_insert();
-        unsafe {
-            let _ = SetWindowPos(
-                hwnd,
-                insert,
-                x,
-                y,
-                slot.width.max(1),
-                slot.height.max(1),
-                SWP_NOACTIVATE,
-            );
-            let _ = ShowWindow(hwnd, if slot.visible { SW_SHOWNA } else { SW_HIDE });
+        for bits in frames {
+            keep_inside(bits_hwnd(bits));
         }
     }
 
@@ -976,11 +807,23 @@ mod win {
             return;
         };
         let hwnd = bits_hwnd(bits);
-        let shell = shell_hwnd();
         unsafe {
             if !IsWindow(hwnd).as_bool() {
                 return;
             }
+            if IsIconic(hwnd).as_bool() || !IsWindowVisible(hwnd).as_bool() {
+                let _ = ShowWindow(hwnd, SW_RESTORE);
+                if set_minimized(bits, false) {
+                    emit_for(bits, "restored", "");
+                }
+            }
+            let _ = SetWindowPos(hwnd, z_insert(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+        force_foreground(hwnd);
+    }
+
+    pub fn force_foreground(hwnd: HWND) {
+        unsafe {
             let foreground = GetForegroundWindow();
             let foreground_thread = GetWindowThreadProcessId(foreground, None);
             let target_thread = GetWindowThreadProcessId(hwnd, None);
@@ -991,7 +834,7 @@ mod win {
             if target_thread != 0 && target_thread != current {
                 let _ = AttachThreadInput(target_thread, current, true);
             }
-            let _ = SetForegroundWindow(shell);
+            let _ = BringWindowToTop(hwnd);
             let _ = SetForegroundWindow(hwnd);
             if target_thread != 0 && target_thread != current {
                 let _ = AttachThreadInput(target_thread, current, false);
@@ -1030,7 +873,7 @@ mod win {
         for bits in keys {
             forget(bits, true);
         }
-        emit_window(instance_id, 0, "", false, false, "exited");
+        emit_window(instance_id, 0, "", false, "exited");
     }
 
     fn sweep() {
@@ -1043,11 +886,10 @@ mod win {
         }
         reassert();
         reap_jobs();
-        sync_region();
     }
 
     fn reassert() {
-        let snapshot: Vec<(isize, Kind, isize)> = {
+        let snapshot: Vec<isize> = {
             let guard = match RUNTIME.lock() {
                 Ok(guard) => guard,
                 Err(err) => err.into_inner(),
@@ -1055,59 +897,18 @@ mod win {
             let Some(runtime) = guard.as_ref() else {
                 return;
             };
-            runtime
-                .windows
-                .iter()
-                .map(|(bits, win)| (*bits, win.kind, win.host_bits))
-                .collect()
+            runtime.windows.keys().copied().collect()
         };
-        let shell = shell_hwnd();
-        for (bits, kind, host_bits) in snapshot {
+        let dragging = DRAGGING.load(Ordering::SeqCst);
+        for bits in snapshot {
             let hwnd = bits_hwnd(bits);
-            unsafe {
-                if !IsWindow(hwnd).as_bool() {
-                    forget(bits, true);
-                    continue;
-                }
-            }
-            match kind {
-                Kind::Embed => {
-                    if host_bits != 0 && !parent_is(hwnd, bits_hwnd(host_bits)) && !reparent_into(hwnd, bits_hwnd(host_bits))
-                    {
-                        convert_to_owned(bits, hwnd);
-                    }
-                }
-                Kind::Owned => {
-                    if let Some(slot) = slot_of(bits) {
-                        place_owned(hwnd, shell, &HostSlot {
-                            hwnd: bits.to_string(),
-                            x: slot.x,
-                            y: slot.y,
-                            width: slot.width,
-                            height: slot.height,
-                            visible: slot.visible,
-                            raise: slot.raise,
-                        });
-                    }
-                }
-                Kind::Transient => clamp_transient(hwnd, shell),
+            if !unsafe { IsWindow(hwnd).as_bool() } {
+                forget(bits, true);
+            } else if bits != dragging {
+                keep_inside(hwnd);
             }
         }
         raise_owned();
-    }
-
-    fn slot_of(bits: isize) -> Option<Slot> {
-        let guard = RUNTIME.lock().ok()?;
-        let runtime = guard.as_ref()?;
-        let win = runtime.windows.get(&bits)?;
-        win.slot.as_ref().map(|slot| Slot {
-            x: slot.x,
-            y: slot.y,
-            width: slot.width,
-            height: slot.height,
-            visible: slot.visible,
-            raise: slot.raise,
-        })
     }
 
     fn reap_jobs() {
@@ -1188,7 +989,7 @@ mod win {
         if shell.0.is_null() {
             return;
         }
-        let owned: Vec<(isize, bool)> = {
+        let owned: Vec<isize> = {
             let guard = match RUNTIME.lock() {
                 Ok(guard) => guard,
                 Err(err) => err.into_inner(),
@@ -1199,13 +1000,12 @@ mod win {
             runtime
                 .windows
                 .iter()
-                .filter(|(_, win)| win.kind == Kind::Owned)
-                .filter(|(_, win)| win.slot.as_ref().map(|slot| slot.visible).unwrap_or(false))
-                .map(|(bits, win)| (*bits, win.slot.as_ref().map(|slot| slot.raise).unwrap_or(false)))
+                .filter(|(_, win)| win.kind == Kind::Frame && !win.minimized)
+                .map(|(bits, _)| *bits)
                 .collect()
         };
         let insert = z_insert();
-        for (bits, _) in owned {
+        for bits in owned {
             let hwnd = bits_hwnd(bits);
             if !is_above(hwnd, shell) || insert == HWND_NOTOPMOST {
                 unsafe {
@@ -1240,165 +1040,69 @@ mod win {
         }
     }
 
-    fn sync_region() {
+    fn desk_rect() -> Option<RECT> {
         let shell = shell_hwnd();
-        let Some(webview) = webview_hwnd(shell) else {
-            return;
+        let desk = {
+            let guard = RUNTIME.lock().ok()?;
+            guard.as_ref()?.desk.as_ref().map(|desk| (desk.x, desk.y, desk.width, desk.height))
         };
-        let mut holes = Vec::new();
-        let signature = {
-            let guard = match RUNTIME.lock() {
-                Ok(guard) => guard,
-                Err(err) => err.into_inner(),
-            };
-            let Some(runtime) = guard.as_ref() else {
-                return;
-            };
-            let mut parts = Vec::new();
-            for win in runtime.windows.values() {
-                if win.kind != Kind::Embed {
-                    continue;
-                }
-                let Some(slot) = &win.slot else {
-                    continue;
-                };
-                if !slot.visible || slot.width < 2 || slot.height < 2 {
-                    continue;
-                }
-                parts.push(format!("{},{},{},{}", slot.x, slot.y, slot.width, slot.height));
-                holes.push((slot.x, slot.y, slot.width, slot.height));
+        let (x, y, width, height) = match desk {
+            Some(desk) => desk,
+            None => {
+                let mut client = RECT::default();
+                unsafe { GetClientRect(shell, &mut client).ok()? };
+                (0, 0, client.right, client.bottom)
             }
-            let mut size = RECT::default();
-            unsafe {
-                let _ = GetClientRect(webview, &mut size);
-            }
-            format!("{}x{}|{}", size.right, size.bottom, parts.join(";"))
         };
-        let unchanged = {
-            let guard = match RUNTIME.lock() {
-                Ok(guard) => guard,
-                Err(err) => err.into_inner(),
-            };
-            guard
-                .as_ref()
-                .map(|runtime| runtime.region_sig == signature)
-                .unwrap_or(false)
-        };
-        if unchanged {
-            return;
-        }
+        let (left, top) = client_to_screen(shell, x, y)?;
+        Some(RECT {
+            left,
+            top,
+            right: left + width.max(1),
+            bottom: top + height.max(1),
+        })
+    }
+
+    // Only moves a window that left the desk (or a maximized one that does not fill it),
+    // so a window the app is already managing inside the shell is never touched.
+    fn keep_inside(hwnd: HWND) {
         unsafe {
-            clip_siblings(webview);
-            let mut client = RECT::default();
-            if GetClientRect(webview, &mut client).is_err() {
+            if IsIconic(hwnd).as_bool() || !IsWindowVisible(hwnd).as_bool() {
                 return;
             }
-            if holes.is_empty() {
-                let _ = SetWindowRgn(webview, HRGN(std::ptr::null_mut()), true);
+            let Some(area) = desk_rect() else {
+                return;
+            };
+            let mut rect = RECT::default();
+            if GetWindowRect(hwnd, &mut rect).is_err() {
+                return;
+            }
+            let target = if IsZoomed(hwnd).as_bool() {
+                area
             } else {
-                let region = CreateRectRgn(0, 0, client.right.max(1), client.bottom.max(1));
-                for (x, y, width, height) in holes {
-                    let Some((sx, sy)) = client_to_screen(shell, x, y) else {
-                        continue;
-                    };
-                    let mut origin = windows::Win32::Foundation::POINT { x: sx, y: sy };
-                    let _ = ScreenToClient(webview, &mut origin);
-                    let hole = CreateRectRgn(origin.x, origin.y, origin.x + width, origin.y + height);
-                    let _ = CombineRgn(region, region, hole, RGN_DIFF);
-                    let _ = DeleteObject(hole);
+                let width = (rect.right - rect.left).clamp(1, (area.right - area.left).max(1));
+                let height = (rect.bottom - rect.top).clamp(1, (area.bottom - area.top).max(1));
+                let left = rect.left.clamp(area.left, (area.right - width).max(area.left));
+                let top = rect.top.clamp(area.top, (area.bottom - height).max(area.top));
+                RECT {
+                    left,
+                    top,
+                    right: left + width,
+                    bottom: top + height,
                 }
-                if SetWindowRgn(webview, region, true) == 0 {
-                    let _ = DeleteObject(region);
-                }
-            }
-        }
-        if let Ok(mut guard) = RUNTIME.lock() {
-            if let Some(runtime) = guard.as_mut() {
-                runtime.region_sig = signature;
-            }
-        }
-    }
-
-    fn parent_is(hwnd: HWND, expected: HWND) -> bool {
-        unsafe {
-            match GetParent(hwnd) {
-                Ok(parent) => parent == expected,
-                Err(_) => false,
-            }
-        }
-    }
-
-    fn clip_siblings(hwnd: HWND) {
-        unsafe {
-            let style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
-            if style & WS_CLIPSIBLINGS.0 != 0 {
-                return;
-            }
-            SetWindowLongPtrW(hwnd, GWL_STYLE, (style | WS_CLIPSIBLINGS.0) as isize);
-        }
-    }
-
-    fn webview_hwnd(shell: HWND) -> Option<HWND> {
-        if shell.0.is_null() {
-            return None;
-        }
-        let mut best: Option<(HWND, i64)> = None;
-        let mut child = window_relative(shell, GW_CHILD);
-        let mut guard = 0;
-        while !child.0.is_null() && guard < 32 {
-            let name = class_name(child);
-            if name != "SolanaOS_Host" {
-                let (width, height) = window_size(child);
-                let area = width as i64 * height as i64;
-                if best.map(|(_, best_area)| area > best_area).unwrap_or(true) {
-                    best = Some((child, area));
-                }
-            }
-            child = window_relative(child, GW_HWNDNEXT);
-            guard += 1;
-        }
-        best.map(|(hwnd, _)| hwnd)
-    }
-
-    fn clamp_transient(hwnd: HWND, shell: HWND) {
-        unsafe {
-            let mut window_rect = RECT::default();
-            let mut client = RECT::default();
-            if GetWindowRect(hwnd, &mut window_rect).is_err() || GetClientRect(shell, &mut client).is_err()
-            {
-                return;
-            }
-            let Some((left, top)) = client_to_screen(shell, 0, 0) else {
-                return;
             };
-            let right = left + client.right;
-            let bottom = top + client.bottom;
-            let mut width = (window_rect.right - window_rect.left).max(1);
-            let mut height = (window_rect.bottom - window_rect.top).max(1);
-            width = width.min((right - left).max(1));
-            height = height.min((bottom - top).max(1));
-            let mut x = window_rect.left;
-            let mut y = window_rect.top;
-            if x < left {
-                x = left;
-            }
-            if y < top {
-                y = top;
-            }
-            if x + width > right {
-                x = (right - width).max(left);
-            }
-            if y + height > bottom {
-                y = (bottom - height).max(top);
-            }
-            if (x - window_rect.left).abs() < 2
-                && (y - window_rect.top).abs() < 2
-                && (width - (window_rect.right - window_rect.left)).abs() < 2
-                && (height - (window_rect.bottom - window_rect.top)).abs() < 2
-            {
+            if target == rect {
                 return;
             }
-            let _ = SetWindowPos(hwnd, z_insert(), x, y, width, height, SWP_NOACTIVATE);
+            let _ = SetWindowPos(
+                hwnd,
+                None,
+                target.left,
+                target.top,
+                target.right - target.left,
+                target.bottom - target.top,
+                SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE,
+            );
         }
     }
 
@@ -1409,89 +1113,6 @@ mod win {
                 return None;
             }
             Some((point.x, point.y))
-        }
-    }
-
-    fn create_host(parent: HWND, x: i32, y: i32, width: i32, height: i32) -> Option<HWND> {
-        ensure_class()?;
-        unsafe {
-            let module = GetModuleHandleW(PCWSTR::null()).ok()?;
-            CreateWindowExW(
-                WINDOW_EX_STYLE::default(),
-                host_class(),
-                PCWSTR::null(),
-                WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-                x,
-                y,
-                width.max(1),
-                height.max(1),
-                parent,
-                HMENU(std::ptr::null_mut()),
-                HINSTANCE(module.0),
-                None,
-            )
-            .ok()
-        }
-    }
-
-    fn ensure_class() -> Option<()> {
-        if CLASS_READY.load(Ordering::SeqCst) {
-            return Some(());
-        }
-        unsafe {
-            let module = GetModuleHandleW(PCWSTR::null()).ok()?;
-            let class = WNDCLASSW {
-                lpfnWndProc: Some(host_wnd_proc),
-                hInstance: HINSTANCE(module.0),
-                lpszClassName: host_class(),
-                hbrBackground: HBRUSH(GetStockObject(BLACK_BRUSH).0),
-                ..Default::default()
-            };
-            if RegisterClassW(&class) == 0 {
-                return None;
-            }
-        }
-        CLASS_READY.store(true, Ordering::SeqCst);
-        Some(())
-    }
-
-    fn host_class() -> PCWSTR {
-        static NAME: OnceLock<Vec<u16>> = OnceLock::new();
-        let name = NAME.get_or_init(|| wide("SolanaOS_Host"));
-        PCWSTR(name.as_ptr())
-    }
-
-    fn reparent_into(hwnd: HWND, host: HWND) -> bool {
-        unsafe {
-            let style = WINDOW_STYLE(GetWindowLongPtrW(hwnd, GWL_STYLE) as u32);
-            let cleared = style
-                & !(WS_POPUP
-                    | WS_CAPTION
-                    | WS_THICKFRAME
-                    | WS_BORDER
-                    | WS_DLGFRAME
-                    | WS_SYSMENU
-                    | WS_MINIMIZEBOX
-                    | WS_MAXIMIZEBOX);
-            let next = cleared | WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
-            SetWindowLongPtrW(hwnd, GWL_STYLE, next.0 as isize);
-            let ex = WINDOW_EX_STYLE(GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32);
-            let ex = (ex & !(WS_EX_APPWINDOW | WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_TOPMOST))
-                | WS_EX_TOOLWINDOW;
-            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex.0 as isize);
-            if SetParent(hwnd, host).is_err() {
-                return false;
-            }
-            let _ = SetWindowPos(
-                hwnd,
-                HWND_TOP,
-                0,
-                0,
-                1,
-                1,
-                SWP_FRAMECHANGED | SWP_NOACTIVATE,
-            );
-            true
         }
     }
 
@@ -1623,9 +1244,6 @@ mod win {
         }
     }
 
-    fn ex_style(hwnd: HWND) -> u32 {
-        unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32 }
-    }
 
     fn window_size(hwnd: HWND) -> (i32, i32) {
         unsafe {
@@ -1662,28 +1280,18 @@ mod win {
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_window, skip_window_class, CaptureClass, EX_NOREDIRECTIONBITMAP};
+    use super::{classify_window, skip_window_class, CaptureClass};
 
     #[test]
-    fn direct_composition_windows_stay_owned() {
-        assert_eq!(
-            classify_window("Chrome_WidgetWin_1", EX_NOREDIRECTIONBITMAP, 1200, 800),
-            CaptureClass::OwnedFrame
-        );
-        assert_eq!(
-            classify_window("Chrome_WidgetWin_1", 0, 1200, 800),
-            CaptureClass::Embed
-        );
+    fn app_windows_are_frames() {
+        assert_eq!(classify_window("Chrome_WidgetWin_1", 1200, 800), CaptureClass::Frame);
+        assert_eq!(classify_window("Notepad", 640, 480), CaptureClass::Frame);
     }
 
     #[test]
     fn menus_are_clamped_without_a_frame() {
-        assert_eq!(classify_window("Chrome_WidgetWin_1", 0, 180, 320), CaptureClass::Transient);
+        assert_eq!(classify_window("Chrome_WidgetWin_1", 180, 320), CaptureClass::Transient);
         assert!(skip_window_class("tooltips_class32"));
-        assert_eq!(
-            classify_window("tooltips_class32", 0, 40, 20),
-            CaptureClass::Ignore
-        );
-        assert_eq!(classify_window("SolanaOS_Host", 0, 400, 300), CaptureClass::Ignore);
+        assert_eq!(classify_window("tooltips_class32", 40, 20), CaptureClass::Ignore);
     }
 }

@@ -46,3 +46,9 @@ macro_rules! diag {
         $crate::diag::write(&format!($($arg)*))
     };
 }
+
+#[tauri::command]
+pub fn diag_log(message: String) {
+    let message: String = message.chars().take(400).collect();
+    write(&format!("ui: {message}"));
+}

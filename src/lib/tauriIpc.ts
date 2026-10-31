@@ -77,39 +77,35 @@ export async function ipcMinimizeShell(): Promise<void> {
 }
 
 export interface ContainmentEvent {
-  kind: 'appeared' | 'title' | 'destroyed' | 'exited';
+  kind: 'appeared' | 'title' | 'minimized' | 'restored' | 'destroyed' | 'exited';
   instanceId: string;
   hwnd: string;
   title: string;
   primary: boolean;
-  embedded: boolean;
   appName: string;
   roomId: string;
 }
 
-export interface HostSlot {
-  hwnd: string;
+export interface DeskArea {
   x: number;
   y: number;
   width: number;
   height: number;
-  visible: boolean;
-  raise: boolean;
 }
 
-export async function ipcContainmentSetSlot(slot: HostSlot): Promise<void> {
+export async function ipcContainmentSetDesk(desk: DeskArea): Promise<void> {
   if (!isTauriRuntime()) return;
-  await invoke('containment_set_slot', { slot });
+  await invoke('containment_set_desk', { desk });
+}
+
+export async function ipcDiagLog(message: string): Promise<void> {
+  if (!isTauriRuntime()) return;
+  await invoke('diag_log', { message });
 }
 
 export async function ipcContainmentFocus(hwnd: string): Promise<void> {
   if (!isTauriRuntime()) return;
   await invoke('containment_focus', { hwnd });
-}
-
-export async function ipcContainmentClose(hwnd: string): Promise<void> {
-  if (!isTauriRuntime()) return;
-  await invoke('containment_close_window', { hwnd });
 }
 
 export async function ipcGetShellPresentation(): Promise<ShellPresentation> {
