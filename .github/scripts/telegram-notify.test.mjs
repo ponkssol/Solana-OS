@@ -7,6 +7,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
   buildMessage,
+  displayAuthor,
   buildNotification,
   jakartaTime,
   isDuplicateRun,
@@ -81,7 +82,7 @@ test('push lists five newest commits and escapes HTML', () => {
     commits,
   }, { runId: '31', runNumber: '31' });
   assert.match(note.text, /2026-10-03 16:51:51 \+07:00/);
-  assert.match(note.text, /Author Nanda &lt;nanda@example.com&gt;/);
+  assert.match(note.text, /Author Nanda\n/);
   assert.deepEqual(note.buttons.map((button) => button.text), ['Compare', 'Action #31', 'Commit']);
   assert.equal(note.buttons[1].url, 'https://github.com/ponkssol/Solana-OS/actions/runs/31');
 });
@@ -105,7 +106,7 @@ test('pull request messages include stats, files, commits, and review state', ()
       user: { login: 'author', html_url: 'https://github.com/author' },
       merged_by: { login: 'merger', html_url: 'https://github.com/merger' },
       merge_commit_sha: 'deadbeefcafebabe',
-      head: { ref: 'cursor/fix', sha: 'abc' },
+      head: { ref: 'feat/fix', sha: 'abc' },
       base: { ref: 'main' },
       labels: [{ name: 'bug' }, { name: 'ui' }],
       assignees: [{ login: 'nanda' }],
@@ -125,7 +126,7 @@ test('pull request messages include stats, files, commits, and review state', ()
   assert.match(pr, /#12/);
   assert.match(pr, /Fix &lt;vault&gt;/);
   assert.match(pr, /Author <a href="https:\/\/github.com\/author">author<\/a>/);
-  assert.match(pr, /cursor\/fix/);
+  assert.match(pr, /feat\/fix/);
   assert.match(pr, /→ <a href="https:\/\/github.com\/ponkssol\/Solana-OS\/tree\/main">main<\/a>/);
   assert.match(pr, /Draft no/);
   assert.match(pr, /Labels bug, ui/);
@@ -403,4 +404,11 @@ test('topic id is included and a bad topic falls back without printing the token
   const fallback = JSON.parse(badTopic.stdout.slice(badTopic.stdout.indexOf('[')));
   assert.equal(fallback[0].message_thread_id, undefined);
   assert.doesNotMatch(badTopic.stdout + badTopic.stderr, /test-token-value/);
+});
+
+test('cursor identities display as ponkssol and emails are never shown', () => {
+  assert.equal(displayAuthor('Cursor Agent', 'cursoragent@cursor.com'), 'ponkssol');
+  assert.equal(displayAuthor('Someone', 'bot@cursor.com'), 'ponkssol');
+  assert.equal(displayAuthor('Ponks solomon', 'me@example.com'), 'Ponks solomon');
+  assert.equal(displayAuthor('only@example.com'), '');
 });

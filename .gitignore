@@ -7,3 +7,4 @@ target/
 .solana/
 test-ledger/
 .vite/
+.cursor/

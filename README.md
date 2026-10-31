@@ -23,7 +23,7 @@ The browser build is a full interactive shell. The Tauri host adds process isola
 
 ### 1. Universal App Cloner & Sandbox Workspace
 
-Inspired by Android *Island*, adapted to a desktop host. Any installed Windows `.exe` (Chrome, Brave, Cursor, VS Code, Telegram, Discord, and the wallet apps) can be launched into a per-Room `AppData`, registry, and filesystem namespace stored beside `vault.solos`. Phantom, Solflare, and Backpack run as standalone windows instead of host browser extensions. Process Freeze (`❄️`) suspends idle clones with `NtSuspendProcess` / `NtResumeProcess` so their CPU drops to 0%.
+Any installed Windows `.exe` (Chrome, Brave, Cursor, VS Code, Telegram, Discord, and the wallet apps) can be launched into a per-Room `AppData`, registry, and filesystem namespace stored beside `vault.solos`. Phantom, Solflare, and Backpack run as standalone windows instead of host browser extensions. Process Freeze (`❄️`) suspends idle clones with `NtSuspendProcess` / `NtResumeProcess` so their CPU drops to 0%.
 
 Tracked in [#3](https://github.com/ponkssol/Solana-OS/issues/3).
 
