@@ -83,7 +83,7 @@ impl EnclaveState {
             status: Mutex::new(VaultStatusPayload {
                 enclave_name: "vault.solos".to_string(),
                 identity: "nanda.solos".to_string(),
-                cipher_suite: "ML-KEM-1024".to_string(),
+                cipher_suite: "Argon2id + XChaCha20-Poly1305".to_string(),
                 locked: true,
                 active_room: "main".to_string(),
                 key_isolation_id: derive_room_key_id("main"),
@@ -494,8 +494,9 @@ fn get_enclave_status(state: State<'_, EnclaveState>) -> Result<ShellEnclaveStat
         cipher_suite: vault.cipher_suite.clone(),
         kdf: "Argon2id".into(),
         aead: "XChaCha20-Poly1305".into(),
-        kem: "ML-KEM-1024".into(),
-        ram_enclave: "VirtualLock + Zeroize".into(),
+        // No post-quantum KEM crate is linked yet; the vault key comes from Argon2id alone.
+        kem: "Not enabled (ML-KEM-1024 planned)".into(),
+        ram_enclave: "Zeroized on drop".into(),
         hardware_shard: "YubiKey shard slot".into(),
         key_id: vault.key_isolation_id.clone(),
         sandboxes: cloner.list_instances(None),

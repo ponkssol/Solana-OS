@@ -78,7 +78,7 @@ export interface OSWindow {
 export interface VaultEnclaveState {
   enclaveName: string;
   identity: string;
-  cipherSuite: 'ML-KEM-1024';
+  cipherSuite: string;
   locked: boolean;
   keyIsolationId: string;
   shieldActive: boolean;
@@ -296,7 +296,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
   vault: {
     enclaveName: 'vault.solos',
     identity: '',
-    cipherSuite: 'ML-KEM-1024',
+    cipherSuite: 'Argon2id + XChaCha20-Poly1305',
     locked: true,
     keyIsolationId: ROOM_CONFIGS.main.keyIsolationId,
     shieldActive: false,
