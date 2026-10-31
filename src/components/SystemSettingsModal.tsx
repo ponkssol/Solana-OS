@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
+import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
+import { exportVaultBackup, importVaultBackup, vaultFilePath } from '../lib/vaultBlob';
 import { useOSStore } from '../store/useOSStore';
 import { BRAND_ASSETS, ROOM_CONFIGS, type RoomId } from '../tokens/designTokens';
 import { BUILT_IN_WALLPAPERS, DEFAULT_RPC_URL, downscaleImage, usePrefs, wallpaperCss } from '../lib/settings';
@@ -9,7 +11,7 @@ import { getSolBalance } from '../lib/rpc';
 import { useErrorLog } from '../lib/errorLog';
 import { ipcReadDiagLog, isTauriRuntime } from '../lib/tauriIpc';
 
-const SECTIONS = ['General', 'Rooms', 'RPC & Wallet', 'Security', 'Appearance', 'Updates', 'Logs'] as const;
+const SECTIONS = ['General', 'Vault', 'Rooms', 'RPC & Wallet', 'Security', 'Appearance', 'Updates', 'Logs'] as const;
 type Section = (typeof SECTIONS)[number];
 
 const FIELD = 'h-[28px] w-full rounded-[6px] border border-white/[0.08] bg-white/[0.06] px-2 text-[12px] outline-none focus:border-[#0A84FF]';
@@ -43,6 +45,7 @@ export function SystemSettingsModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
           {section === 'General' && <General />}
+          {section === 'Vault' && <VaultBackup />}
           {section === 'Rooms' && <Rooms />}
           {section === 'RPC & Wallet' && <RpcWallet />}
           {section === 'Security' && <Security />}
@@ -65,6 +68,80 @@ function General() {
       <SettingsRow label="Vault" value={vault.locked ? 'Locked' : `Unlocked · ${vault.cipherSuite}`} />
       <SettingsRow label="Key isolation ID" value={vault.keyIsolationId} />
     </>
+  );
+}
+
+function VaultBackup() {
+  const [path, setPath] = useState('');
+  const [importing, setImporting] = useState<string | null>(null);
+  const [passphrase, setPassphrase] = useState('');
+  const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState(false);
+  const filters = [{ name: 'Solana OS vault backup', extensions: ['solvault'] }];
+
+  useEffect(() => {
+    if (isTauriRuntime()) void vaultFilePath().then(setPath).catch(() => undefined);
+  }, []);
+
+  const exportBackup = async () => {
+    setStatus('');
+    try {
+      const date = new Date().toISOString().slice(0, 10);
+      const destination = await saveDialog({ defaultPath: `solana-os-vault-${date}.solvault`, filters });
+      if (!destination) return;
+      await exportVaultBackup(destination);
+      setStatus(`Backup saved to ${destination}`);
+    } catch (err) {
+      setStatus(`Export failed: ${String(err)}`);
+    }
+  };
+
+  const pickImport = async () => {
+    setStatus('');
+    const source = await openDialog({ multiple: false, directory: false, filters });
+    if (typeof source === 'string') setImporting(source);
+  };
+
+  const confirmImport = async () => {
+    if (!importing) return;
+    setBusy(true);
+    try {
+      await importVaultBackup(importing, passphrase);
+      setStatus('Backup imported. Lock and unlock with the backup passphrase to use it.');
+      setImporting(null);
+    } catch (err) {
+      setStatus(`Import failed: ${String(err)}`);
+    } finally {
+      setPassphrase('');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <SettingsRow label="Vault file" value={path || 'Unavailable outside the desktop app'} />
+      <p className="text-[12px] leading-5 text-[#8a8a8a]">
+        A backup is the same encrypted file, sealed with Argon2id and XChaCha20-Poly1305. Opening it needs the passphrase that was set when it was exported.
+      </p>
+      <div className="flex gap-2">
+        <button type="button" className="os-btn os-btn-primary" onClick={() => void exportBackup()}>Export backup…</button>
+        <button type="button" className="os-btn" onClick={() => void pickImport()}>Import backup…</button>
+      </div>
+      {importing && (
+        <div className="flex flex-col gap-2 rounded-[10px] border border-white/[0.08] bg-white/[0.03] p-3">
+          <div className="truncate text-[12px]">{importing}</div>
+          <div className="text-[12px] text-[#ff9f0a]">Importing replaces the vault on this machine.</div>
+          <input type="password" autoFocus placeholder="Backup passphrase" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} className={FIELD} />
+          <div className="flex gap-2">
+            <button type="button" disabled={busy || !passphrase} className="os-btn os-btn-primary" onClick={() => void confirmImport()}>
+              {busy ? 'Verifying…' : 'Import'}
+            </button>
+            <button type="button" className="os-btn" onClick={() => setImporting(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {status && <div className="break-all text-[12px] text-white/80">{status}</div>}
+    </div>
   );
 }
 

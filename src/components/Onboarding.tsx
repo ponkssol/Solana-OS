@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
-import { generateMnemonic } from '@scure/bip39';
+import { generateMnemonic, validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { ipcSealVault } from '../lib/tauriIpc';
-import { writeSealedVault } from '../lib/vaultBlob';
+import { createVault } from '../lib/vaultBlob';
 import { useOSStore } from '../store/useOSStore';
 import { ROOM_CONFIGS, type RoomId } from '../tokens/designTokens';
 
-type Step = 'passphrase' | 'phrase' | 'confirm' | 'room';
+type Step = 'recover' | 'passphrase' | 'phrase' | 'confirm' | 'room';
 
 function pickChecks(): number[] {
   const picks = new Set<number>();
@@ -14,11 +13,14 @@ function pickChecks(): number[] {
   return [...picks].sort((a, b) => a - b);
 }
 
-export function Onboarding({ onDone }: { onDone: () => void }) {
+export function Onboarding({ mode = 'create', onDone, onCancel, onRestore }: { mode?: 'create' | 'restore'; onDone: () => void; onCancel?: () => void; onRestore?: () => void }) {
   const { unlockVault, switchRoom } = useOSStore();
-  const words = useMemo(() => generateMnemonic(wordlist, 256).split(' '), []);
+  const generated = useMemo(() => generateMnemonic(wordlist, 256).split(' '), []);
+  const [phraseInput, setPhraseInput] = useState('');
+  const restored = phraseInput.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const words = mode === 'restore' ? restored : generated;
   const checks = useMemo(pickChecks, []);
-  const [step, setStep] = useState<Step>('passphrase');
+  const [step, setStep] = useState<Step>(mode === 'restore' ? 'recover' : 'passphrase');
   const [pass, setPass] = useState('');
   const [pass2, setPass2] = useState('');
   const [answers, setAnswers] = useState<string[]>(['', '', '']);
@@ -28,10 +30,17 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
   const next = async () => {
     setError('');
+    if (step === 'recover') {
+      if (restored.length !== 24) return setError(`Enter all 24 words. You entered ${restored.length}.`);
+      const unknown = restored.find((w) => !wordlist.includes(w));
+      if (unknown) return setError(`"${unknown}" is not a BIP39 English word.`);
+      if (!validateMnemonic(restored.join(' '), wordlist)) return setError('The checksum is wrong. Check the word order and spelling.');
+      return setStep('passphrase');
+    }
     if (step === 'passphrase') {
       if (pass.length < 8) return setError('Use at least 8 characters.');
       if (pass !== pass2) return setError("The passphrases don't match.");
-      return setStep('phrase');
+      return setStep(mode === 'restore' ? 'room' : 'phrase');
     }
     if (step === 'phrase') return setStep('confirm');
     if (step === 'confirm') {
@@ -40,7 +49,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     }
     setBusy(true);
     try {
-      writeSealedVault(await ipcSealVault(pass, new TextEncoder().encode(words.join(' '))));
+      await createVault(pass, words.join(' '));
       if (!(await unlockVault(pass))) throw new Error('The new vault could not be opened.');
       await switchRoom(room);
       onDone();
@@ -60,11 +69,27 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         style={{ background: 'rgba(30,30,30,0.9)', backdropFilter: 'blur(40px)' }}
       >
         <h2 className="text-[15px] font-[700]">
-          {step === 'passphrase' && 'Create vault.solos'}
+          {step === 'recover' && 'Restore from recovery phrase'}
+          {step === 'passphrase' && (mode === 'restore' ? 'Set a new passphrase' : 'Create vault.solos')}
           {step === 'phrase' && 'Your 24-word recovery phrase'}
           {step === 'confirm' && 'Confirm the recovery phrase'}
           {step === 'room' && 'Pick a starting room'}
         </h2>
+
+        {step === 'recover' && (
+          <>
+            <p className="text-[12px] leading-5 text-white/70">
+              Enter the 24 words from setup, in order, separated by spaces. Restoring replaces any vault on this machine.
+            </p>
+            <textarea
+              autoFocus
+              value={phraseInput}
+              onChange={(e) => setPhraseInput(e.target.value)}
+              spellCheck={false}
+              className="h-[110px] resize-none rounded-[8px] border border-white/[0.08] bg-white/10 p-3 font-mono text-[12px] outline-none"
+            />
+          </>
+        )}
 
         {step === 'passphrase' && (
           <>
@@ -121,13 +146,27 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
         {error && <div className="text-[12px] text-[#ff6961]">{error}</div>}
         <div className="flex justify-end gap-2">
-          {step !== 'passphrase' && (
-            <button type="button" className="os-btn" onClick={() => setStep(step === 'room' ? 'confirm' : step === 'confirm' ? 'phrase' : 'passphrase')}>
+          {onRestore && step === 'passphrase' && (
+            <button type="button" className="os-btn mr-auto" onClick={onRestore}>
+              Restore from recovery phrase
+            </button>
+          )}
+          {onCancel && (
+            <button type="button" className="os-btn mr-auto" onClick={onCancel}>
+              Cancel
+            </button>
+          )}
+          {step !== 'passphrase' && step !== 'recover' && (
+            <button
+              type="button"
+              className="os-btn"
+              onClick={() => setStep(step === 'room' ? (mode === 'restore' ? 'passphrase' : 'confirm') : step === 'confirm' ? 'phrase' : 'passphrase')}
+            >
               Back
             </button>
           )}
           <button type="button" className="os-btn os-btn-primary" disabled={busy} onClick={() => void next()}>
-            {step === 'phrase' ? "I've written it down" : step === 'room' ? (busy ? 'Sealing…' : 'Create vault') : 'Continue'}
+            {step === 'phrase' ? "I've written it down" : step === 'room' ? (busy ? 'Sealing…' : mode === 'restore' ? 'Restore vault' : 'Create vault') : 'Continue'}
           </button>
         </div>
       </div>

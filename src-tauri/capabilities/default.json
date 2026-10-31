@@ -28,6 +28,8 @@
     "core:window:allow-set-resizable",
     "core:window:allow-show",
     "updater:default",
-    "process:allow-restart"
+    "process:allow-restart",
+    "dialog:allow-save",
+    "dialog:allow-open"
   ]
 }

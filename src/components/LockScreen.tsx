@@ -4,7 +4,7 @@ import { useOSStore } from '../store/useOSStore';
 import { BRAND_ASSETS } from '../tokens/designTokens';
 import { WIFI_ICON } from './macosMaterials';
 import { usePrefs, wallpaperCss } from '../lib/settings';
-import { readSealedVault } from '../lib/vaultBlob';
+import { vaultExists } from '../lib/vaultBlob';
 import { Onboarding } from './Onboarding';
 
 export const LockScreen: React.FC = () => {
@@ -23,10 +23,18 @@ export const LockScreen: React.FC = () => {
   const { unlockVault, setScreen } = useOSStore();
   const identity = useOSStore((state) => state.vault.identity);
   const [passphrase, setPassphrase] = useState('');
-  const [sheet, setSheet] = useState<'restore' | 'create' | 'recovery' | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [onboarding, setOnboarding] = useState(() => !readSealedVault());
+  const [onboarding, setOnboarding] = useState<'create' | 'restore' | null>(null);
+  const [hasVault, setHasVault] = useState(true);
+  useEffect(() => {
+    vaultExists()
+      .then((exists) => {
+        setHasVault(exists);
+        if (!exists) setOnboarding('create');
+      })
+      .catch((err) => setError(`Couldn't read the vault file: ${String(err)}`));
+  }, []);
   const wallpaper = usePrefs((state) => wallpaperCss(state));
   const now = new Date();
 
@@ -93,18 +101,18 @@ export const LockScreen: React.FC = () => {
           </button>
         </div>
         <div className="mt-2 flex items-center gap-2 text-[12px] text-white/70">
-          <button type="button" onClick={() => setSheet('restore')}>
-            Restore vault.solos
+          <button type="button" onClick={() => setOnboarding('restore')}>
+            Restore from recovery phrase
           </button>
           <span>·</span>
-          <button type="button" onClick={() => setOnboarding(true)}>
+          <button type="button" onClick={() => setOnboarding('create')}>
             Create account
           </button>
         </div>
       </form>
 
       <div className="absolute bottom-[36px] left-0 right-0 flex justify-center gap-16 text-[12px] text-white/80">
-        <button type="button" onClick={() => setSheet('recovery')} className="flex flex-col items-center gap-2">
+        <button type="button" onClick={() => setOnboarding('restore')} className="flex flex-col items-center gap-2">
           <span className="flex size-9 items-center justify-center rounded-full bg-white/15 backdrop-blur-xl">⌂</span>
           24-Word Recovery
         </button>
@@ -114,31 +122,16 @@ export const LockScreen: React.FC = () => {
         </button>
       </div>
 
-      {onboarding && <Onboarding onDone={() => setOnboarding(false)} />}
-
-      {sheet && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40" onClick={() => setSheet(null)}>
-          <div
-            onClick={(event) => event.stopPropagation()}
-            className="w-[min(360px,calc(100%-32px))] rounded-[16px] border border-white/[0.06] p-4"
-            style={{ background: 'rgba(30,30,30,0.85)', backdropFilter: 'blur(40px)' }}
-          >
-            <h2 className="mb-2 text-[13px] font-[700]">
-              {sheet === 'restore' && 'Restore vault.solos'}
-              {sheet === 'create' && 'Create account'}
-              {sheet === 'recovery' && '24-Word Recovery'}
-            </h2>
-            <p className="mb-4 text-[11px] leading-[14px] text-white/70">
-              {sheet === 'recovery'
-                ? 'Restoring from the 24-word phrase is not available in this build yet. Keep your written copy safe.'
-                : 'Restoring from a portable container is not available yet. Create a new vault or unlock this one with its passphrase.'}
-            </p>
-            <button type="button" onClick={() => setSheet(null)} className="os-btn os-btn-primary w-full">
-              OK
-            </button>
-          </div>
-        </div>
+      {onboarding && (
+        <Onboarding
+          key={onboarding}
+          mode={onboarding}
+          onDone={() => setOnboarding(null)}
+          onCancel={hasVault || onboarding === 'restore' ? () => setOnboarding(hasVault ? null : 'create') : undefined}
+          onRestore={onboarding === 'create' ? () => setOnboarding('restore') : undefined}
+        />
       )}
+
     </div>
   );
 };
