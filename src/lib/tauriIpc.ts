@@ -92,3 +92,18 @@ export async function ipcGetVaultStatus(): Promise<VaultStatusPayload> {
   requireTauri();
   return await invoke<VaultStatusPayload>('get_vault_status');
 }
+
+export async function ipcSealVault(passphrase: string, plaintext: Uint8Array): Promise<number[]> {
+  requireTauri();
+  return await invoke<number[]>('seal_vault_solos', { passphrase, plaintext: Array.from(plaintext) });
+}
+
+export async function ipcOpenVault(passphrase: string, blob: number[]): Promise<number[]> {
+  requireTauri();
+  return await invoke<number[]>('open_vault_solos', { passphrase, blob });
+}
+
+export async function ipcReadDiagLog(): Promise<string> {
+  requireTauri();
+  return await invoke<string>('read_diag_log');
+}

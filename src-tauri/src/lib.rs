@@ -573,6 +573,8 @@ pub fn run() {
     let initial_state = EnclaveState::new();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(initial_state)
         .invoke_handler(tauri::generate_handler![
             unlock_vault_solos,
@@ -613,6 +615,7 @@ pub fn run() {
             shell_mode::minimize_shell,
             containment::containment_set_desk,
             diag::diag_log,
+            diag::read_diag_log,
             containment::containment_focus,
             containment::containment_close_window
         ])

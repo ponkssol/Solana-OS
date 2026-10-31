@@ -1,7 +1,7 @@
 {
   "name": "solana-os",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.0-alpha.3",
   "description": "Solana OS — Post-Quantum macOS Sonoma/Sequoia Web3 Desktop Environment (ML-KEM-1024 / vault.solos)",
   "type": "module",
   "scripts": {
@@ -13,7 +13,10 @@
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
+    "@scure/bip39": "^1.6.0",
     "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.1",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

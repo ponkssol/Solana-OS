@@ -8,7 +8,8 @@ import { FloatingDock } from './components/FloatingDock';
 import { Spotlight } from './components/Spotlight';
 import { Launchpad } from './components/Launchpad';
 import { NotificationStack } from './components/NotificationStack';
-import { WALLPAPER } from './components/macosMaterials';
+import { usePrefs, wallpaperCss } from './lib/settings';
+import { useIdleGuards } from './lib/useIdleGuards';
 import { SystemSettingsModal } from './components/SystemSettingsModal';
 
 export const App: React.FC = () => {
@@ -23,6 +24,8 @@ export const App: React.FC = () => {
     settingsOpen,
     setSettingsOpen,
   } = useOSStore();
+  const wallpaper = usePrefs((s) => wallpaperCss(s));
+  useIdleGuards();
 
   useEffect(() => {
     syncVaultStatus();
@@ -63,7 +66,7 @@ export const App: React.FC = () => {
       className="relative flex h-full w-full select-none flex-col overflow-hidden text-white"
       style={{ filter: `brightness(${displayBrightness}%)` }}
     >
-      <img src={WALLPAPER} alt="" className="pointer-events-none absolute inset-0 size-full object-cover" />
+      <div className="pointer-events-none absolute inset-0" style={{ background: wallpaper }} />
       <TopMenuBar />
       <WindowManager />
       <NotificationStack />
