@@ -1,11 +1,18 @@
+import { invoke } from '@tauri-apps/api/core';
+import { isTauriRuntime } from './tauriIpc';
+
+// Public Solana RPCs reject requests with a browser Origin (HTTP 403), so in the
+// desktop app the request goes out from the Rust side instead of the webview.
+async function post(url: string, payload: string): Promise<{ status: number; body: string }> {
+  if (isTauriRuntime()) return invoke<{ status: number; body: string }>('rpc_post', { url, body: payload });
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload });
+  return { status: res.status, body: await res.text() };
+}
+
 async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  });
-  if (!res.ok) throw new Error(`RPC returned HTTP ${res.status}`);
-  const body = await res.json();
+  const res = await post(url, JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }));
+  if (res.status < 200 || res.status >= 300) throw new Error(`RPC returned HTTP ${res.status}`);
+  const body = JSON.parse(res.body);
   if (body.error) throw new Error(body.error.message ?? 'RPC error');
   return body.result as T;
 }

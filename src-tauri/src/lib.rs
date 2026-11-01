@@ -582,6 +582,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             shield_proxy::shield_proxy_set_upstream,
             shield_proxy::shield_proxy_url,
+            shield_proxy::rpc_post,
             shield_proxy::shield_proxy_decide,
             wallet::wallet_accounts,
             unlock_vault_solos,

@@ -211,6 +211,36 @@ pub fn shield_proxy_set_upstream(url: String) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Serialize)]
+pub struct RpcReply {
+    status: u16,
+    body: String,
+}
+
+/// JSON-RPC POST for the UI. Public Solana RPCs answer 403 to requests carrying a
+/// browser Origin, so the webview's own fetch can't reach them; this sends none.
+#[tauri::command]
+pub async fn rpc_post(url: String, body: String) -> Result<RpcReply, String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("The RPC URL must start with http:// or https://.".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        match ureq::post(&url)
+            .set("Content-Type", "application/json")
+            .timeout(Duration::from_secs(30))
+            .send_string(&body)
+        {
+            Ok(resp) => Ok(RpcReply { status: resp.status(), body: resp.into_string().map_err(|e| e.to_string())? }),
+            Err(ureq::Error::Status(status, resp)) => {
+                Ok(RpcReply { status, body: resp.into_string().unwrap_or_default() })
+            }
+            Err(err) => Err(format!("RPC request failed: {err}")),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub fn shield_proxy_url() -> Option<String> {
     PROXY.get().map(|p| format!("http://127.0.0.1:{}/room/<room>", p.port))
