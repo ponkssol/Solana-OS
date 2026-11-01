@@ -1,9 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-process.env.NODE_ENV = 'test';
 process.env.QUICKNODE_RPC_URL ||= 'https://example.invalid/';
-const { checkCall, takeTokens } = await import('./server.mjs');
+const { checkCall, takeTokens } = await import('./proxy.mjs');
 
 test('allows the methods the app uses', () => {
   for (const method of ['getBalance', 'getLatestBlockhash', 'simulateTransaction', 'sendTransaction',
