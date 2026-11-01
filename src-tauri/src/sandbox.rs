@@ -25,10 +25,10 @@ pub fn run_sandboxed_cli_command(
     let shell = normalize_shell(shell_type)?;
     let room = sanitize_room(room_id);
     let root = room_mount(&room);
-    let prompt = format!(
-        "solana-os@windows-conpty C:\\VaultRooms\\{}>",
-        windows_room_name(&room)
-    );
+    #[cfg(windows)]
+    let prompt = format!("solana-os@windows-conpty C:\\VaultRooms\\{}>", windows_room_name(&room));
+    #[cfg(not(windows))]
+    let prompt = format!("solana-os@preview ~/VaultRooms/{}$", windows_room_name(&room));
 
     #[cfg(windows)]
     {
@@ -43,7 +43,7 @@ pub fn run_sandboxed_cli_command(
             room_id: room,
             prompt,
             output: format!(
-                "Windows ConPTY bridge is compiled for the Windows host.\nPreview of `{command}` was not executed on this platform."
+                "The sandboxed shell runs only on Windows. `{command}` was not executed on this platform."
             ),
             exit_code: 0,
             conpty: false,
