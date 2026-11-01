@@ -582,6 +582,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             shield_proxy::shield_proxy_set_upstream,
             shield_proxy::shield_proxy_url,
+            shield_proxy::rpc_defaults,
             shield_proxy::rpc_post,
             shield_proxy::shield_proxy_decide,
             wallet::wallet_accounts,
@@ -594,6 +595,7 @@ pub fn run() {
             vault_file::read_vault_file,
             vault_file::write_vault_file,
             vault_file::unlock_vault_file,
+            vault_file::set_custom_rpc,
             vault_file::create_vault_file,
             vault_file::vault_file_suite,
             wallet::wallet_info,

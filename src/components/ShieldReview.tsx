@@ -111,7 +111,7 @@ export function ShieldReview() {
           </pre>
         )}
 
-        {request.kind === 'transaction' && !analysis && <div className="text-[#8a8a8a]">Simulating against {rpcUrl}…</div>}
+        {request.kind === 'transaction' && !analysis && <div className="text-[#8a8a8a]">Simulating against {rpcHost(rpcUrl)}…</div>}
         {analysis && request.kind === 'transaction' && (
           <div className="flex flex-col gap-2">
             {analysis.simulationError ? (
@@ -206,7 +206,7 @@ function ExternalReview({ tx, rpcUrl }: { tx: ExternalTx; rpcUrl: string }) {
         <div className="text-[12px] text-[#8a8a8a]">
           An app in this room is broadcasting a signed transaction through the Solana OS RPC. Rejecting stops it from being sent.
         </div>
-        {!analysis && <div className="text-[#8a8a8a]">Simulating against {rpcUrl}…</div>}
+        {!analysis && <div className="text-[#8a8a8a]">Simulating against {rpcHost(rpcUrl)}…</div>}
         {analysis?.error && <div className="text-[#ff9f0a]">Couldn't analyze: {analysis.error}</div>}
         {analysis?.payer && <div className="[overflow-wrap:anywhere]">Fee payer: {analysis.payer}</div>}
         {sim && (
@@ -231,4 +231,12 @@ function ExternalReview({ tx, rpcUrl }: { tx: ExternalTx; rpcUrl: string }) {
       </div>
     </div>
   );
+}
+
+function rpcHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "the RPC";
+  }
 }

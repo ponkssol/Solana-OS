@@ -1,7 +1,11 @@
+import { invoke } from '@tauri-apps/api/core';
 import { create } from 'zustand';
 import { WALLPAPER } from '../components/macosMaterials';
+import { isTauriRuntime } from './tauriIpc';
 
+// Fallback until the host reports its built-in default (the Solana OS RPC proxy).
 export const DEFAULT_RPC_URL = 'https://api.mainnet-beta.solana.com';
+export const DEVNET_RPC_URL = 'https://api.devnet.solana.com';
 
 export interface WallpaperOption {
   id: string;
@@ -22,8 +26,15 @@ export interface Prefs {
   idleFreezeMinutes: number;
   wallpaperId: string;
   customWallpaper: string;
+  /** Effective endpoint for this session: the custom RPC from the vault, else the default. */
   rpcUrl: string;
+  /** Custom RPC opened from the vault; never written to localStorage. */
+  customRpcUrl: string;
+  defaultRpcUrl: string;
 }
+
+// Session-only fields: a custom RPC URL can embed a provider token.
+const RUNTIME_KEYS = ['rpcUrl', 'customRpcUrl', 'defaultRpcUrl'] as const;
 
 const PREFS_SLOT = 'solana-os.prefs.v1';
 
@@ -33,11 +44,19 @@ const DEFAULTS: Prefs = {
   wallpaperId: 'sonoma',
   customWallpaper: '',
   rpcUrl: DEFAULT_RPC_URL,
+  customRpcUrl: '',
+  defaultRpcUrl: DEFAULT_RPC_URL,
 };
+
+// Earlier builds kept a user-entered rpcUrl in localStorage; it moves into the vault on unlock.
+let legacyRpcUrl = '';
 
 function load(): Prefs {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(PREFS_SLOT) || '{}') };
+    const stored = JSON.parse(localStorage.getItem(PREFS_SLOT) || '{}') as Record<string, unknown>;
+    if (typeof stored.rpcUrl === 'string' && stored.rpcUrl !== DEFAULT_RPC_URL) legacyRpcUrl = stored.rpcUrl;
+    for (const key of RUNTIME_KEYS) delete stored[key];
+    return { ...DEFAULTS, ...stored };
   } catch {
     return DEFAULTS;
   }
@@ -51,7 +70,8 @@ export const usePrefs = create<PrefsStore>((set, get) => ({
   ...load(),
   update: (patch) => {
     set(patch);
-    const { update: _update, ...prefs } = { ...get(), ...patch };
+    const { update: _update, ...prefs } = { ...get(), ...patch } as Partial<PrefsStore>;
+    for (const key of RUNTIME_KEYS) delete prefs[key];
     try {
       localStorage.setItem(PREFS_SLOT, JSON.stringify(prefs));
     } catch {
@@ -59,6 +79,44 @@ export const usePrefs = create<PrefsStore>((set, get) => ({
     }
   },
 }));
+
+export async function loadRpcDefaults(): Promise<void> {
+  if (!isTauriRuntime()) return;
+  try {
+    const { mainnet } = await invoke<{ mainnet: string; devnet: string }>('rpc_defaults');
+    const { customRpcUrl } = usePrefs.getState();
+    usePrefs.setState({ defaultRpcUrl: mainnet, rpcUrl: customRpcUrl || mainnet });
+  } catch {
+    // Keep the built-in fallback.
+  }
+}
+
+/** Applies the custom RPC opened from the vault (or clears it with null). */
+export function applyCustomRpc(url: string | null): void {
+  const custom = url?.trim() ?? '';
+  usePrefs.setState((s) => ({ customRpcUrl: custom, rpcUrl: custom || s.defaultRpcUrl }));
+}
+
+/** Seals the custom RPC in the vault; an empty URL restores the default endpoint. */
+export async function saveCustomRpc(passphrase: string, url: string): Promise<void> {
+  await invoke('set_custom_rpc', { passphrase, url: url.trim() });
+  applyCustomRpc(url);
+}
+
+/** After unlock: apply the vault's custom RPC, migrating a legacy plaintext one once. */
+export async function restoreCustomRpc(passphrase: string, sealed: string | null | undefined): Promise<void> {
+  if (!sealed && legacyRpcUrl && isTauriRuntime()) {
+    try {
+      await saveCustomRpc(passphrase, legacyRpcUrl);
+      legacyRpcUrl = '';
+      usePrefs.getState().update({});
+      return;
+    } catch {
+      // Fall through and use the default endpoint.
+    }
+  }
+  applyCustomRpc(sealed ?? null);
+}
 
 export function wallpaperCss(prefs: Pick<Prefs, 'wallpaperId' | 'customWallpaper'>): string {
   if (prefs.wallpaperId === 'custom' && prefs.customWallpaper) {

@@ -6,7 +6,7 @@ import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialo
 import { exportVaultBackup, importVaultBackup, vaultFilePath } from '../lib/vaultBlob';
 import { useOSStore } from '../store/useOSStore';
 import { BRAND_ASSETS, ROOM_CONFIGS, type RoomId } from '../tokens/designTokens';
-import { BUILT_IN_WALLPAPERS, DEFAULT_RPC_URL, downscaleImage, usePrefs, wallpaperCss } from '../lib/settings';
+import { BUILT_IN_WALLPAPERS, DEVNET_RPC_URL, downscaleImage, saveCustomRpc, usePrefs, wallpaperCss } from '../lib/settings';
 import { getSolBalance } from '../lib/rpc';
 import { useErrorLog } from '../lib/errorLog';
 import { ipcReadDiagLog, isTauriRuntime } from '../lib/tauriIpc';
@@ -172,18 +172,27 @@ function Rooms() {
 }
 
 function RpcWallet() {
-  const { rpcUrl, update } = usePrefs();
+  const { rpcUrl, customRpcUrl, defaultRpcUrl } = usePrefs();
   const address = useWallet((s) => s.address);
-  const [url, setUrl] = useState(rpcUrl);
+  const [url, setUrl] = useState(customRpcUrl);
+  const [passphrase, setPassphrase] = useState('');
   const [status, setStatus] = useState('');
 
-  const save = async () => {
-    const trimmed = url.trim() || DEFAULT_RPC_URL;
-    update({ rpcUrl: trimmed });
-    if (!address) return setStatus('Saved.');
-    setStatus('Checking balance…');
+  const save = async (next: string) => {
+    if (!address) return setStatus('Unlock the vault first: the custom RPC is stored encrypted in it.');
+    if (!passphrase) return setStatus('Enter your vault passphrase to save.');
+    setStatus('Saving…');
     try {
-      setStatus(`Saved. Balance: ${(await getSolBalance(trimmed, address)).toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL`);
+      await saveCustomRpc(passphrase, next);
+      setPassphrase('');
+      setUrl(next.trim());
+    } catch (err) {
+      return setStatus(String(err));
+    }
+    const endpoint = next.trim() || usePrefs.getState().defaultRpcUrl;
+    try {
+      const sol = await getSolBalance(endpoint, address);
+      setStatus(`Saved. Balance: ${sol.toLocaleString(undefined, { maximumFractionDigits: 9 })} SOL`);
     } catch (err) {
       setStatus(`Saved, but the balance check failed: ${String(err)}`);
     }
@@ -191,21 +200,39 @@ function RpcWallet() {
 
   return (
     <div className="flex flex-col gap-3">
+      <SettingsRow label="Active endpoint" value={customRpcUrl ? 'Custom RPC' : rpcLabelFor(rpcUrl, defaultRpcUrl)} />
       <label className="flex flex-col gap-1">
-        <span className="text-[#8a8a8a]">RPC endpoint</span>
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={DEFAULT_RPC_URL} className={FIELD} />
+        <span className="text-[#8a8a8a]">Custom RPC</span>
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://your-rpc.example.com"
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          className={FIELD}
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-[#8a8a8a]">Vault passphrase</span>
+        <input value={passphrase} onChange={(e) => setPassphrase(e.target.value)} type="password" autoComplete="current-password" className={FIELD} />
       </label>
       <SettingsRow label="Wallet address" value={address ?? 'Unlock the vault to load it'} />
       <p className="text-[12px] leading-5 text-[#8a8a8a]">
-        The public mainnet endpoint is rate-limited. Use your own RPC URL for reliable balances and simulations.
+        By default Solana OS uses its own rate-limited mainnet RPC proxy. A custom RPC URL may contain an access token,
+        so it is encrypted in your vault and never stored in plain text. Devnet uses {DEVNET_RPC_URL}.
       </p>
       <div className="flex items-center gap-3">
-        <button type="button" className="os-btn os-btn-primary" onClick={() => void save()}>Save</button>
-        <button type="button" className="os-btn" onClick={() => setUrl(DEFAULT_RPC_URL)}>Use default</button>
+        <button type="button" className="os-btn os-btn-primary" onClick={() => void save(url)}>Save</button>
+        <button type="button" className="os-btn" onClick={() => void save('')}>Use default</button>
       </div>
       {status && <div className="text-[12px] text-white/80">{status}</div>}
     </div>
   );
+}
+
+function rpcLabelFor(url: string, defaultUrl: string): string {
+  return url === defaultUrl ? `Default (${new URL(url).host})` : url;
 }
 
 function Security() {

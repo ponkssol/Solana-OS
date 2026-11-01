@@ -8,7 +8,7 @@ import { FloatingDock } from './components/FloatingDock';
 import { Spotlight } from './components/Spotlight';
 import { Launchpad } from './components/Launchpad';
 import { NotificationStack } from './components/NotificationStack';
-import { usePrefs, wallpaperCss } from './lib/settings';
+import { loadRpcDefaults, usePrefs, wallpaperCss } from './lib/settings';
 import { useIdleGuards } from './lib/useIdleGuards';
 import { SystemSettingsModal } from './components/SystemSettingsModal';
 import { ShieldReview } from './components/ShieldReview';
@@ -36,6 +36,10 @@ export const App: React.FC = () => {
   useEffect(() => {
     syncVaultStatus();
   }, [syncVaultStatus]);
+
+  useEffect(() => {
+    void loadRpcDefaults();
+  }, []);
 
   const rpcUrl = usePrefs((s) => s.rpcUrl);
   useEffect(() => {

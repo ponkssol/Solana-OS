@@ -12,6 +12,7 @@ import {
 } from '../lib/tauriIpc';
 import { unlockVaultFile, vaultExists } from '../lib/vaultBlob';
 import { lockWallet, setUnlocked } from '../lib/wallet';
+import { applyCustomRpc, restoreCustomRpc } from '../lib/settings';
 import {
   getEnclaveStatus,
   launchInstalledApp,
@@ -346,7 +347,11 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
 
   unlockVault: async (passphrase = '••••••••') => {
     try {
-      if (await vaultExists()) setUnlocked(await unlockVaultFile(passphrase));
+      if (await vaultExists()) {
+        const result = await unlockVaultFile(passphrase);
+        setUnlocked(result);
+        await restoreCustomRpc(passphrase, result.customRpc);
+      }
       const payload = await ipcUnlockVaultSolos(passphrase);
       set((state) => ({
         screen: 'desktop',
@@ -379,6 +384,7 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
 
   lockVault: async () => {
     await lockWallet().catch(() => undefined);
+    applyCustomRpc(null);
     const payload = await ipcLockVaultSolos();
     set((state) => ({
       screen: 'lock',

@@ -234,7 +234,7 @@ function WalletBalance() {
           ))
         )}
       </div>
-      <div className="text-[11px] text-[#8a8a8a]">Endpoint: {rpcUrl}</div>
+      <div className="text-[11px] text-[#8a8a8a]">Endpoint: {usePrefs.getState().customRpcUrl ? "Custom RPC" : rpcUrl.replace(/^https?:\/\/([^/]+).*$/, "$1")}</div>
       <SendSol from={address} account={account.index} onSent={() => setRefresh((n) => n + 1)} />
       <SignMessage account={account.index} />
     </div>

@@ -6,6 +6,7 @@ export interface UnlockResult {
   address: string | null;
   suite: string;
   migrated: boolean;
+  customRpc?: string | null;
 }
 
 export interface WalletAccount {

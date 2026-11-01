@@ -37,6 +37,26 @@ struct ExternalTx {
     encoding: String,
 }
 
+/// Default mainnet endpoint: the Solana OS RPC proxy, which keeps the premium provider
+/// credential server-side. A build can override it with `SOLANA_OS_DEFAULT_RPC`.
+pub const DEFAULT_MAINNET_RPC: &str = match option_env!("SOLANA_OS_DEFAULT_RPC") {
+    Some(url) => url,
+    None => "https://api.mainnet-beta.solana.com",
+};
+pub const DEFAULT_DEVNET_RPC: &str = "https://api.devnet.solana.com";
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcDefaults {
+    mainnet: &'static str,
+    devnet: &'static str,
+}
+
+#[tauri::command]
+pub fn rpc_defaults() -> RpcDefaults {
+    RpcDefaults { mainnet: DEFAULT_MAINNET_RPC, devnet: DEFAULT_DEVNET_RPC }
+}
+
 pub fn install(app: &AppHandle) {
     let listener = match TcpListener::bind("127.0.0.1:0") {
         Ok(l) => l,
@@ -49,7 +69,7 @@ pub fn install(app: &AppHandle) {
     let _ = PROXY.set(Proxy {
         port: addr.port(),
         app: app.clone(),
-        upstream: Mutex::new("https://api.mainnet-beta.solana.com".into()),
+        upstream: Mutex::new(DEFAULT_MAINNET_RPC.into()),
         pending: Mutex::new(HashMap::new()),
         next_id: AtomicU64::new(0),
     });
