@@ -36,18 +36,14 @@ jobs:
           $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           "version=$version" >> $env:GITHUB_OUTPUT
 
-      # Updater artifacts need the signing key; forks and PRs without the secret still get plain installers.
+      # createUpdaterArtifacts is set in tauri.conf.json, so the signing key secret is required.
       - name: Build Tauri NSIS and MSI installers
         shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          if ($env:TAURI_SIGNING_PRIVATE_KEY) {
-            npx tauri build --bundles nsis,msi --config '{\"bundle\":{\"createUpdaterArtifacts\":true}}'
-          } else {
-            npx tauri build --bundles nsis,msi
-          }
+          npx tauri build --bundles nsis,msi
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Stage installers and updater manifest
