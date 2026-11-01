@@ -137,6 +137,20 @@ export function queueExternal(tx: ExternalTx) {
   useWallet.setState((s) => ({ external: [...s.external, tx] }));
 }
 
+export function expireExternal(id: number) {
+  useWallet.setState((s) => {
+    const tx = s.external.find((e) => e.id === id);
+    if (!tx) return {};
+    return {
+      external: s.external.filter((e) => e.id !== id),
+      history: [
+        { id: -tx.id, at: Date.now(), kind: 'transaction' as const, summary: `Transaction from room ${tx.room} (timed out)`, approved: false },
+        ...s.history.slice(0, 19),
+      ],
+    };
+  });
+}
+
 export async function decideExternal(tx: ExternalTx, approve: boolean) {
   await invoke('shield_proxy_decide', { id: tx.id, approve }).catch(() => undefined);
   useWallet.setState((s) => ({

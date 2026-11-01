@@ -15,7 +15,7 @@ import { ShieldReview } from './components/ShieldReview';
 import { invoke } from '@tauri-apps/api/core';
 import { isTauriRuntime } from './lib/tauriIpc';
 import { listen } from '@tauri-apps/api/event';
-import { queueExternal, type ExternalTx } from './lib/wallet';
+import { expireExternal, queueExternal, type ExternalTx } from './lib/wallet';
 import { UpdatePrompt } from './components/UpdatePrompt';
 
 export const App: React.FC = () => {
@@ -45,8 +45,10 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (!isTauriRuntime()) return;
     const off = listen<ExternalTx>('shield://external-tx', (e) => queueExternal(e.payload));
+    const offExpired = listen<number>('shield://external-tx-expired', (e) => expireExternal(e.payload));
     return () => {
       void off.then((fn) => fn());
+      void offExpired.then((fn) => fn());
     };
   }, []);
 

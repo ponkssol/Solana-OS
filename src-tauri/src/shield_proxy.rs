@@ -162,11 +162,16 @@ fn review(proxy: &Proxy, room: &str, request: &Value) -> bool {
     if proxy.app.emit("shield://external-tx", event).is_err() {
         return false;
     }
-    let approved = rx.recv_timeout(DECISION_TIMEOUT).unwrap_or(false);
+    let decision = rx.recv_timeout(DECISION_TIMEOUT);
     if let Ok(mut pending) = proxy.pending.lock() {
         pending.remove(&id);
     }
-    approved
+    if decision.is_err() {
+        // Nobody answered in time and the caller already got a rejection: take the
+        // stale prompt off screen so a late click can't look like it did anything.
+        let _ = proxy.app.emit("shield://external-tx-expired", id);
+    }
+    decision.unwrap_or(false)
 }
 
 #[tauri::command]
