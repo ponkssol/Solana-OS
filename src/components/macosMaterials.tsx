@@ -58,7 +58,9 @@ export function Stoplights({
   );
 }
 
-export function SidebarVibrancy({ width = 240 }: { width?: number }) {
+// Fills its sidebar exactly; a fixed width wider than the sidebar painted over the
+// first pixels of the content pane next to it.
+export function SidebarVibrancy({ width = '100%' }: { width?: number | string }) {
   return (
     <div className="pointer-events-none absolute inset-y-0 left-0 bg-[#141517]" style={{ width }} />
   );
