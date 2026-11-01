@@ -6,6 +6,7 @@ import { WIFI_ICON } from './macosMaterials';
 import { usePrefs, wallpaperCss } from '../lib/settings';
 import { vaultExists } from '../lib/vaultBlob';
 import { Onboarding } from './Onboarding';
+import { useNow } from '../lib/useNow';
 
 export const LockScreen: React.FC = () => {
   // Lands in solana-os.log next to the backend input probe, to tell a click that never
@@ -36,7 +37,7 @@ export const LockScreen: React.FC = () => {
       .catch((err) => setError(`Couldn't read the vault file: ${String(err)}`));
   }, []);
   const wallpaper = usePrefs((state) => wallpaperCss(state));
-  const now = new Date();
+  const now = useNow();
 
   const unlock = async () => {
     if (busy) return;

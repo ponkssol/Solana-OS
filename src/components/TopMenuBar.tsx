@@ -4,6 +4,7 @@ import { BentoControlCenter } from './BentoControlCenter';
 import { CONTROL_CENTER_ICON, WIFI_ICON } from './macosMaterials';
 import { ipcMinimizeShell } from '../lib/tauriIpc';
 import { ROOM_CONFIGS } from '../tokens/designTokens';
+import { useNow } from '../lib/useNow';
 
 const MENUS: { label: string; windowId?: WindowId; heavy?: boolean }[] = [
   { label: 'Solana OS', heavy: true },
@@ -17,6 +18,7 @@ const MENUS: { label: string; windowId?: WindowId; heavy?: boolean }[] = [
 ];
 
 export const TopMenuBar: React.FC = () => {
+  const now = useNow();
   const {
     lockVault,
     toggleShield,
@@ -100,8 +102,8 @@ export const TopMenuBar: React.FC = () => {
           )}
         </div>
         <div className="flex gap-[8px] pl-[9px] text-[13px] font-[590] leading-[16px]">
-          <span>Thu Oct 29</span>
-          <span>9:41 AM</span>
+          <span>{now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).replace(',', '')}</span>
+          <span>{now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
         </div>
         <button
           type="button"
