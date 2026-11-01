@@ -430,16 +430,15 @@ export const useOSStore = create<OSStoreState>((set, get) => ({
     const payload = await ipcSwitchRoom(room);
     const nextZ = get().topZIndex + 1;
 
-    const defaultRoomWindowMap: Record<RoomId, WindowId> = {
-      main: 'vault-monitor',
-      degen: 'degen-terminal',
-      dev: 'dev-console',
-      burner: 'burner-session',
-    };
-    const targetWinId = defaultRoomWindowMap[room];
+    // The legacy per-room windows only render a title placeholder; every room view lives
+    // in the shell window, filtered to the room that was switched to.
+    const targetWinId: WindowId = 'app-cloner';
 
     set((state) => ({
       activeRoom: room,
+      roomFilter: room,
+      shellView: 'sandboxes',
+      terminalOpen: false,
       topZIndex: nextZ,
       vault: {
         ...state.vault,
