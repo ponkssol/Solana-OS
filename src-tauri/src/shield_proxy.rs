@@ -75,6 +75,7 @@ fn serve(mut stream: TcpStream) -> std::io::Result<()> {
     let method = parts.next().unwrap_or("").to_string();
     let path = parts.next().unwrap_or("/").to_string();
     let mut length = 0usize;
+    let mut origin: Option<String> = None;
     loop {
         let mut line = String::new();
         if reader.read_line(&mut line)? == 0 || line == "\r\n" || line == "\n" {
@@ -83,25 +84,51 @@ fn serve(mut stream: TcpStream) -> std::io::Result<()> {
         if let Some((name, value)) = line.split_once(':') {
             if name.eq_ignore_ascii_case("content-length") {
                 length = value.trim().parse().unwrap_or(0);
+            } else if name.eq_ignore_ascii_case("origin") {
+                origin = Some(value.trim().to_string());
             }
         }
     }
+    // Native apps and CLI tools send no Origin. A browser always does, so any web
+    // page that found the port is turned away before it can raise a review prompt.
+    let allowed = match origin.as_deref() {
+        None => None,
+        Some(o) if origin_allowed(o) => Some(o.to_string()),
+        Some(_) => return respond(&mut stream, 403, "", None),
+    };
     if method == "OPTIONS" {
-        return respond(&mut stream, 204, "");
+        return respond(&mut stream, 204, "", allowed.as_deref());
     }
     if method != "POST" || length > MAX_BODY {
-        return respond(&mut stream, 405, "");
+        return respond(&mut stream, 405, "", allowed.as_deref());
     }
     let mut body = vec![0u8; length];
     reader.read_exact(&mut body)?;
     let room = path.strip_prefix("/room/").unwrap_or("unknown").to_string();
     let reply = handle(&room, &body);
-    respond(&mut stream, 200, &reply)
+    respond(&mut stream, 200, &reply, allowed.as_deref())
 }
 
-fn respond(stream: &mut TcpStream, status: u16, body: &str) -> std::io::Result<()> {
+/// Origins of Solana OS's own webview (release and `tauri dev`).
+fn origin_allowed(origin: &str) -> bool {
+    matches!(
+        origin,
+        "tauri://localhost" | "http://tauri.localhost" | "https://tauri.localhost" | "http://localhost:1420"
+    )
+}
+
+fn respond(stream: &mut TcpStream, status: u16, body: &str, origin: Option<&str>) -> std::io::Result<()> {
+    let reason = match status {
+        200 => "OK",
+        204 => "No Content",
+        403 => "Forbidden",
+        _ => "Method Not Allowed",
+    };
+    let cors = origin
+        .map(|o| format!("Access-Control-Allow-Origin: {o}\r\nVary: Origin\r\nAccess-Control-Allow-Headers: content-type, solana-client\r\n"))
+        .unwrap_or_default();
     let head = format!(
-        "HTTP/1.1 {status} OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: content-type, solana-client\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\n{cors}Content-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     );
     stream.write_all(head.as_bytes())?;
@@ -196,6 +223,28 @@ pub fn shield_proxy_decide(id: u64, approve: bool) {
             if let Some(tx) = pending.remove(&id) {
                 let _ = tx.send(approve);
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::origin_allowed;
+
+    #[test]
+    fn only_app_origins_are_allowed() {
+        for ok in ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://localhost:1420"] {
+            assert!(origin_allowed(ok), "{ok}");
+        }
+        for bad in [
+            "https://evil.example",
+            "http://localhost:3000",
+            "null",
+            "",
+            "http://tauri.localhost.evil.example",
+            "tauri://localhost.evil",
+        ] {
+            assert!(!origin_allowed(bad), "{bad}");
         }
     }
 }
