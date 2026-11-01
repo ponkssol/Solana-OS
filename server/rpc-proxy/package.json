@@ -1,0 +1,13 @@
+{
+  "name": "solana-os-rpc-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Rate-limited Solana JSON-RPC proxy that keeps the provider credential server-side.",
+  "type": "module",
+  "main": "server.mjs",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test"
+  }
+}
