@@ -4,7 +4,7 @@ import { WALLPAPER } from '../components/macosMaterials';
 import { isTauriRuntime } from './tauriIpc';
 
 // Fallback until the host reports its built-in default (the Solana OS RPC proxy).
-export const DEFAULT_RPC_URL = 'https://api.mainnet-beta.solana.com';
+export const DEFAULT_RPC_URL = 'https://solana-os-rpc-proxy.vercel.app';
 export const DEVNET_RPC_URL = 'https://api.devnet.solana.com';
 
 export interface WallpaperOption {
@@ -50,11 +50,13 @@ const DEFAULTS: Prefs = {
 
 // Earlier builds kept a user-entered rpcUrl in localStorage; it moves into the vault on unlock.
 let legacyRpcUrl = '';
+// Defaults of earlier builds are not user choices, so they are not migrated.
+const LEGACY_DEFAULTS = [DEFAULT_RPC_URL, 'https://api.mainnet-beta.solana.com'];
 
 function load(): Prefs {
   try {
     const stored = JSON.parse(localStorage.getItem(PREFS_SLOT) || '{}') as Record<string, unknown>;
-    if (typeof stored.rpcUrl === 'string' && stored.rpcUrl !== DEFAULT_RPC_URL) legacyRpcUrl = stored.rpcUrl;
+    if (typeof stored.rpcUrl === 'string' && !LEGACY_DEFAULTS.includes(stored.rpcUrl)) legacyRpcUrl = stored.rpcUrl;
     for (const key of RUNTIME_KEYS) delete stored[key];
     return { ...DEFAULTS, ...stored };
   } catch {

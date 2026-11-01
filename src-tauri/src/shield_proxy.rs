@@ -41,7 +41,7 @@ struct ExternalTx {
 /// credential server-side. A build can override it with `SOLANA_OS_DEFAULT_RPC`.
 pub const DEFAULT_MAINNET_RPC: &str = match option_env!("SOLANA_OS_DEFAULT_RPC") {
     Some(url) => url,
-    None => "https://api.mainnet-beta.solana.com",
+    None => "https://solana-os-rpc-proxy.vercel.app",
 };
 pub const DEFAULT_DEVNET_RPC: &str = "https://api.devnet.solana.com";
 

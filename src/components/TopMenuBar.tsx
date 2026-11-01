@@ -5,9 +5,10 @@ import { CONTROL_CENTER_ICON, WIFI_ICON } from './macosMaterials';
 import { ipcMinimizeShell } from '../lib/tauriIpc';
 import { ROOM_CONFIGS } from '../tokens/designTokens';
 import { useNow } from '../lib/useNow';
-import { usePrefs } from '../lib/settings';
+import { DEFAULT_RPC_URL, usePrefs } from '../lib/settings';
 
 function rpcLabel(url: string): string {
+  if (url === DEFAULT_RPC_URL) return 'Solana OS mainnet';
   try {
     return new URL(url).hostname.replace(/^api\./, '').replace(/\.solana\.com$/, '');
   } catch {

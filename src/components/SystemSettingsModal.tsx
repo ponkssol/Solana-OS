@@ -219,7 +219,7 @@ function RpcWallet() {
       </label>
       <SettingsRow label="Wallet address" value={address ?? 'Unlock the vault to load it'} />
       <p className="text-[12px] leading-5 text-[#8a8a8a]">
-        By default Solana OS uses its own rate-limited mainnet RPC proxy. A custom RPC URL may contain an access token,
+        Mainnet uses the Solana OS RPC proxy (solana-os-rpc-proxy.vercel.app), which is shared and rate-limited per IP. A custom RPC URL may contain an access token,
         so it is encrypted in your vault and never stored in plain text. Devnet uses {DEVNET_RPC_URL}.
       </p>
       <div className="flex items-center gap-3">
