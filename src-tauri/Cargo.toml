@@ -1,6 +1,6 @@
 [package]
 name = "solana-os"
-version = "1.0.0-alpha.6"
+version = "1.0.0-alpha.7"
 description = "Solana OS desktop shell with contained app rooms and vault.solos"
 authors = ["Solana OS Core Team"]
 edition = "2021"

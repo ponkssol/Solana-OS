@@ -198,8 +198,8 @@ mod win {
         PeekMessageW, PostMessageW, PostThreadMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
         ShowWindow, TranslateMessage, EVENT_OBJECT_CREATE, EVENT_OBJECT_DESTROY, EVENT_OBJECT_HIDE,
         EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_NAMECHANGE, EVENT_OBJECT_SHOW, GA_ROOT, GET_WINDOW_CMD,
-        GWL_EXSTYLE, GWL_STYLE, GWLP_HWNDPARENT, GW_HWNDPREV, HWND_NOTOPMOST, HWND_TOPMOST, MSG,
-        PM_NOREMOVE, PM_REMOVE, QS_ALLINPUT, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE,
+        GWL_EXSTYLE, GWL_STYLE, IsHungAppWindow, GW_HWNDPREV, HWND_NOTOPMOST, HWND_TOPMOST, MSG,
+        PM_NOREMOVE, PM_REMOVE, QS_ALLINPUT, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE,
         SWP_NOZORDER, SW_HIDE, SW_RESTORE, WINDOW_EX_STYLE, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
         WM_CLOSE, WM_QUIT, WS_CHILD, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
     };
@@ -207,10 +207,13 @@ mod win {
     const EVENT_OBJECT_UNCLOAKED: u32 = 0x8018;
     const EVENT_SYSTEM_MOVESIZESTART: u32 = 0x000A;
     const EVENT_SYSTEM_MOVESIZEEND: u32 = 0x000B;
+    const EVENT_SYSTEM_FOREGROUND: u32 = 0x0003;
     const EVENT_SYSTEM_MINIMIZESTART: u32 = 0x0016;
     const EVENT_SYSTEM_MINIMIZEEND: u32 = 0x0017;
     const STILL_ACTIVE: u32 = 259;
     static HOOK_THREAD: AtomicU32 = AtomicU32::new(0);
+    const SWEEP_EVERY: Duration = Duration::from_millis(500);
+    const PROBE_EVERY: Duration = Duration::from_secs(3);
     // The window inside a native move/size loop; clamping it mid-drag fights the loop and flickers.
     static DRAGGING: AtomicIsize = AtomicIsize::new(0);
 
@@ -223,7 +226,7 @@ mod win {
         exited: bool,
     }
 
-    #[derive(Clone, Copy, PartialEq, Eq)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     enum Kind {
         Frame,
         Transient,
@@ -421,7 +424,18 @@ mod win {
                 0,
                 WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
             );
+            let _ = SetWinEventHook(
+                EVENT_SYSTEM_FOREGROUND,
+                EVENT_SYSTEM_FOREGROUND,
+                HMODULE(std::ptr::null_mut()),
+                Some(on_event),
+                0,
+                0,
+                WINEVENT_OUTOFCONTEXT,
+            );
         }
+        let mut last_sweep = Instant::now() - SWEEP_EVERY;
+        let mut last_probe = Instant::now();
         loop {
             unsafe {
                 let mut msg = MSG::default();
@@ -435,7 +449,16 @@ mod win {
                 }
             }
             drain();
-            sweep();
+            // Events handle the live work; the sweep only catches windows the hooks missed,
+            // and running it at the old 80 ms cadence kept clones busy answering messages.
+            if last_sweep.elapsed() >= SWEEP_EVERY {
+                last_sweep = Instant::now();
+                sweep();
+            }
+            if last_probe.elapsed() >= PROBE_EVERY {
+                last_probe = Instant::now();
+                probe_hung();
+            }
         }
     }
 
@@ -449,6 +472,13 @@ mod win {
         _time: u32,
     ) {
         if id_object != 0 || id_child != 0 || hwnd.0.is_null() {
+            return;
+        }
+        if event == EVENT_SYSTEM_FOREGROUND {
+            let bits = hwnd_bits(hwnd);
+            if let Some(kind) = kind_of(bits) {
+                crate::diag!("input-probe foreground hwnd={bits:#x} kind={kind:?}");
+            }
             return;
         }
         if (EVENT_SYSTEM_MOVESIZESTART..=EVENT_SYSTEM_MINIMIZEEND).contains(&event) {
@@ -609,7 +639,7 @@ mod win {
         if shell.0.is_null() {
             return;
         }
-        strip_taskbar(hwnd, shell);
+        strip_taskbar(hwnd);
         let title = window_title(hwnd);
         crate::diag!(
             "capture {instance_id} hwnd={:#x} class={class_name} {width}x{height} as {:?}",
@@ -620,7 +650,7 @@ mod win {
             remember(hwnd, instance_id, Kind::Transient, title, false);
             keep_inside(hwnd);
             unsafe {
-                let _ = SetWindowPos(hwnd, z_insert(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                let _ = SetWindowPos(hwnd, z_insert(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
             }
             return;
         }
@@ -628,7 +658,7 @@ mod win {
         remember(hwnd, instance_id, Kind::Frame, title.clone(), true);
         keep_inside(hwnd);
         unsafe {
-            let _ = SetWindowPos(hwnd, z_insert(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            let _ = SetWindowPos(hwnd, z_insert(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
         }
         emit_window(instance_id, hwnd_bits(hwnd), &title, primary, "appeared");
     }
@@ -821,7 +851,7 @@ mod win {
                     emit_for(bits, "restored", "");
                 }
             }
-            let _ = SetWindowPos(hwnd, z_insert(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            let _ = SetWindowPos(hwnd, z_insert(), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
         }
         force_foreground(hwnd);
     }
@@ -830,19 +860,12 @@ mod win {
         unsafe {
             let foreground = GetForegroundWindow();
             let foreground_thread = GetWindowThreadProcessId(foreground, None);
-            let target_thread = GetWindowThreadProcessId(hwnd, None);
             let current = GetCurrentThreadId();
             if foreground_thread != 0 && foreground_thread != current {
                 let _ = AttachThreadInput(foreground_thread, current, true);
             }
-            if target_thread != 0 && target_thread != current {
-                let _ = AttachThreadInput(target_thread, current, true);
-            }
             let _ = BringWindowToTop(hwnd);
             let _ = SetForegroundWindow(hwnd);
-            if target_thread != 0 && target_thread != current {
-                let _ = AttachThreadInput(target_thread, current, false);
-            }
             if foreground_thread != 0 && foreground_thread != current {
                 let _ = AttachThreadInput(foreground_thread, current, false);
             }
@@ -1011,9 +1034,9 @@ mod win {
         let insert = z_insert();
         for bits in owned {
             let hwnd = bits_hwnd(bits);
-            if !is_above(hwnd, shell) || insert == HWND_NOTOPMOST {
+            if !is_above(hwnd, shell) {
                 unsafe {
-                    let _ = SetWindowPos(hwnd, insert, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                    let _ = SetWindowPos(hwnd, insert, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
                 }
             }
         }
@@ -1026,7 +1049,7 @@ mod win {
     fn is_above(upper: HWND, lower: HWND) -> bool {
         let mut cursor = window_relative(lower, GW_HWNDPREV);
         let mut guard = 0;
-        while !cursor.0.is_null() && guard < 64 {
+        while !cursor.0.is_null() && guard < 1024 {
             if cursor == upper {
                 return true;
             }
@@ -1105,7 +1128,7 @@ mod win {
                 target.top,
                 target.right - target.left,
                 target.bottom - target.top,
-                SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE,
+                SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS,
             );
         }
     }
@@ -1120,14 +1143,28 @@ mod win {
         }
     }
 
-    fn strip_taskbar(hwnd: HWND, owner: HWND) {
+    // WS_EX_TOOLWINDOW alone keeps the window off the taskbar. Making the shell its owner
+    // as well attached the clone's input queue to the webview thread, so a busy shell froze
+    // clicks in every hosted app; raise_owned keeps the z-order instead.
+    fn strip_taskbar(hwnd: HWND) {
         unsafe {
             let ex = WINDOW_EX_STYLE(GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32);
             let ex = (ex & !WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
             SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex.0 as isize);
-            let style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
-            if style & WS_CHILD.0 == 0 && !owner.0.is_null() {
-                SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, owner.0 as isize);
+        }
+    }
+
+    fn probe_hung() {
+        let frames: Vec<isize> = {
+            let guard = RUNTIME.lock().unwrap_or_else(|err| err.into_inner());
+            let Some(runtime) = guard.as_ref() else {
+                return;
+            };
+            runtime.windows.keys().copied().collect()
+        };
+        for bits in frames {
+            if unsafe { IsHungAppWindow(bits_hwnd(bits)).as_bool() } {
+                crate::diag!("input-probe hung hwnd={bits:#x}");
             }
         }
     }
