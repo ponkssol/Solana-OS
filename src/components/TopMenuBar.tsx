@@ -5,6 +5,15 @@ import { CONTROL_CENTER_ICON, WIFI_ICON } from './macosMaterials';
 import { ipcMinimizeShell } from '../lib/tauriIpc';
 import { ROOM_CONFIGS } from '../tokens/designTokens';
 import { useNow } from '../lib/useNow';
+import { usePrefs } from '../lib/settings';
+
+function rpcLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^api\./, '').replace(/\.solana\.com$/, '');
+  } catch {
+    return '';
+  }
+}
 
 const MENUS: { label: string; windowId?: WindowId; heavy?: boolean }[] = [
   { label: 'Solana OS', heavy: true },
@@ -19,6 +28,7 @@ const MENUS: { label: string; windowId?: WindowId; heavy?: boolean }[] = [
 
 export const TopMenuBar: React.FC = () => {
   const now = useNow();
+  const rpcHost = rpcLabel(usePrefs((state) => state.rpcUrl));
   const {
     lockVault,
     toggleShield,
@@ -68,8 +78,8 @@ export const TopMenuBar: React.FC = () => {
 
       <div className="flex items-center">
         <span className="mr-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-[590]">
-          <span className="size-1.5 rounded-full bg-[#8e8e93]" />
-          RPC not configured
+          <span className={`size-1.5 rounded-full ${rpcHost ? 'bg-[#0A84FF]' : 'bg-[#8e8e93]'}`} />
+          {rpcHost ? `RPC: ${rpcHost}` : 'RPC not configured'}
         </span>
         <button type="button" aria-label="Spotlight" onClick={() => setSpotlightOpen(true)} className="px-[9px] py-[4px] text-[13px]">
           ⌕
