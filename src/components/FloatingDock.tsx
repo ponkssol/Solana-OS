@@ -1,21 +1,33 @@
 import React from 'react';
+import { ipcContainmentFocus } from '../lib/tauriIpc';
 import { useOSStore, WindowId } from '../store/useOSStore';
+import { AppIcon } from './AppIcon';
 import { DOCK_ICONS, DockGlass, FIGMA } from './macosMaterials';
 
 const APP_SLOTS: { label: string; windowId: WindowId }[] = [
-  { label: 'Solana OS', windowId: 'vault-monitor' },
+  { label: 'Active Sandboxes', windowId: 'app-cloner' },
   { label: 'Launchpad', windowId: 'app-cloner' },
-  { label: 'Safari', windowId: 'degen-terminal' },
-  { label: 'Messages', windowId: 'phantom-wallet' },
-  { label: 'Mail', windowId: 'solflare-wallet' },
-  { label: 'Maps', windowId: 'backpack-wallet' },
-  { label: 'Photos', windowId: 'dev-console' },
-  { label: 'FaceTime', windowId: 'burner-session' },
+  { label: 'Anti-Drainer Shield', windowId: 'app-cloner' },
+  { label: 'Phantom', windowId: 'app-cloner' },
+  { label: 'Solflare', windowId: 'app-cloner' },
+  { label: 'Backpack', windowId: 'app-cloner' },
+  { label: 'Builder Suite', windowId: 'app-cloner' },
+  { label: 'Quantum Vault', windowId: 'app-cloner' },
 ];
 
 export const FloatingDock: React.FC = () => {
-  const { openWindow, focusWindow, setShellView, setWalletBrand } = useOSStore();
+  const { openWindow, focusWindow, setShellView, setWalletBrand, setLaunchpadOpen, hosted, instanceBadges } = useOSStore();
+  const seen = new Set<string>();
+  const running = hosted.filter((win) => {
+    if (seen.has(win.instanceId)) return false;
+    seen.add(win.instanceId);
+    return true;
+  });
   const openView = (index: number) => {
+    if (index === 1) {
+      setLaunchpadOpen(true);
+      return;
+    }
     openWindow('app-cloner');
     focusWindow('app-cloner');
     if (index === 2) setShellView('shield');
@@ -58,6 +70,27 @@ export const FloatingDock: React.FC = () => {
       >
         &gt;_
       </button>
+      {running.map((app) => (
+        <button
+          key={app.instanceId}
+          type="button"
+          aria-label={app.appName}
+          onClick={() => {
+            const hwnd = useOSStore.getState().focusHostedInstance(app.instanceId);
+            if (hwnd) void ipcContainmentFocus(hwnd);
+          }}
+          className="relative mb-[4px] flex h-[47px] w-[36px] flex-col items-center"
+        >
+          <AppIcon
+            path={instanceBadges[app.instanceId]?.exePath ?? ''}
+            name={app.appName}
+            size={36}
+            cloned={instanceBadges[app.instanceId]?.cloned}
+            cloneNumber={instanceBadges[app.instanceId]?.cloneNumber}
+          />
+          <span className="absolute bottom-0 size-1 rounded-full bg-white/80" />
+        </button>
+      ))}
       <img src="/icons/folder.svg" alt="" className="mb-[4px] size-[36px]" />
       <img src={`${FIGMA}/cc48b.png`} alt="" className="mb-[4px] size-[36px] object-contain" />
     </div>

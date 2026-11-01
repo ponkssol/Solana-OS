@@ -4,9 +4,11 @@ title = "Solana OS"
 useDefault = true
 
 [allowlist]
-description = "Lockfiles and generated schemas are not secrets"
+description = "Lockfiles, generated schemas and known false positives are not secrets"
 paths = [
   '''(^|/)Cargo\.lock$''',
   '''(^|/)package-lock\.json$''',
   '''src-tauri/gen/schemas/.*''',
 ]
+# c10c044 (1fd5e92 before the history rewrite) named a localStorage slot constant KEY; the value is a storage name, not a credential.
+commits = ["1fd5e9239f1af6398e89586663fde4e7941d4c96", "c10c044ca09bb3abf54f594fd7bbe4124765434f"]

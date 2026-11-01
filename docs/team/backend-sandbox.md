@@ -48,3 +48,11 @@ Cloning, freeze, and the virtual desktop switch are in the host. #25 fixed the W
 
 - Windows install check of fullscreen, DPI, and the taskbar toggle.
 - Make `get_enclave_status` the source of the cloner table, including an empty list.
+
+## Diagnostic log (Windows)
+
+The shell appends to `%LOCALAPPDATA%\os.solana.desktop\logs\solana-os.log`
+(rotated to `solana-os.old.log` past 2 MB). It records startup, shell presentation
+changes and minimize, clone launches with the ResumeThread result, job enrollment,
+captured app windows with their class and size, freezes, releases and exits.
+Attach this file to any Windows bug report.

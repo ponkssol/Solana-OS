@@ -1,22 +1,38 @@
 import { useState } from 'react';
 import { runSandboxedCliCommand, type ShellKind } from '../lib/tauriBridge';
 
-const TABS: { id: ShellKind; label: string }[] = [
-  { id: 'pwsh', label: 'pwsh.exe — Degen Room (ConPTY)' },
-  { id: 'cmd', label: 'cmd.exe — Win32 Bridge' },
-  { id: 'solana-cli', label: 'solana-cli — Dev Room' },
-];
+// The sandboxed shells (ConPTY, PowerShell, cmd) exist only on the Windows build.
+const IS_WINDOWS = typeof navigator !== 'undefined' && /windows/i.test(navigator.userAgent);
+const STATUS = IS_WINDOWS
+  ? 'Windows ConPTY Connected (PowerShell / CMD Bridge)'
+  : 'Preview only: the sandboxed shell runs on Windows';
 
-const QUICK = ['solana balance', 'solana config get', 'anchor build', 'winget list', 'dir', 'whoami', 'help', 'clear'];
+const TABS: { id: ShellKind; label: string }[] = IS_WINDOWS
+  ? [
+      { id: 'pwsh', label: 'pwsh.exe (ConPTY)' },
+      { id: 'cmd', label: 'cmd.exe — Win32 Bridge' },
+      { id: 'solana-cli', label: 'solana-cli' },
+    ]
+  : [
+      { id: 'pwsh', label: 'PowerShell (Windows only)' },
+      { id: 'cmd', label: 'cmd (Windows only)' },
+      { id: 'solana-cli', label: 'solana-cli' },
+    ];
+
+const QUICK = IS_WINDOWS
+  ? ['solana balance', 'solana config get', 'anchor build', 'winget list', 'dir', 'whoami', 'help', 'clear']
+  : ['solana balance', 'solana config get', 'anchor build', 'help', 'clear'];
 
 export function TerminalWindow({ roomId = 'treasury' }: { roomId?: string }) {
   const [shell, setShell] = useState<ShellKind>('pwsh');
   const [lines, setLines] = useState<string[]>([
-    'Windows ConPTY Connected (PowerShell / CMD Bridge)',
+    STATUS,
     'Zero-Exposure id.json Hook Active',
   ]);
   const [draft, setDraft] = useState('');
-  const prompt = `solana-os@windows-conpty C:\\VaultRooms\\${roomFolder(roomId)}>`;
+  const prompt = IS_WINDOWS
+    ? `solana-os@windows-conpty C:\\VaultRooms\\${roomFolder(roomId)}>`
+    : `solana-os@preview ~/VaultRooms/${roomFolder(roomId)}$`;
 
   const run = async (command: string) => {
     const text = command.trim();
@@ -26,8 +42,12 @@ export function TerminalWindow({ roomId = 'treasury' }: { roomId?: string }) {
       setDraft('');
       return;
     }
-    const result = await runSandboxedCliCommand(roomId, shell, text);
-    setLines((prev) => [...prev, `${result.prompt} ${text}`, result.output].filter((line) => line.length > 0));
+    try {
+      const result = await runSandboxedCliCommand(roomId, shell, text);
+      setLines((prev) => [...prev, `${result.prompt} ${text}`, result.output].filter((line) => line.length > 0));
+    } catch (error) {
+      setLines((prev) => [...prev, `> ${text}`, String(error)]);
+    }
     setDraft('');
   };
 
@@ -51,7 +71,7 @@ export function TerminalWindow({ roomId = 'treasury' }: { roomId?: string }) {
       </div>
       <div className="flex gap-2 px-3 py-2 text-[11px]">
         <span className="rounded-[6px] border border-white/[0.06] bg-white/[0.05] px-2 py-1 text-[#8a8a8a]">
-          Windows ConPTY Connected (PowerShell / CMD Bridge)
+          {STATUS}
         </span>
         <span className="rounded-[6px] border border-[#0A84FF]/30 bg-[#0A84FF]/10 px-2 py-1 text-[#0A84FF]">
           Zero-Exposure id.json Hook Active

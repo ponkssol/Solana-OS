@@ -83,6 +83,11 @@ pub struct CloneLaunchRequest {
     pub launch_on_enclave_desktop: Option<bool>,
     #[serde(default, alias = "instance_label")]
     pub instance_label: Option<String>,
+    /// `Some(false)` opens the app with its normal profile instead of an isolated clone.
+    #[serde(default)]
+    pub isolate: Option<bool>,
+    #[serde(default)]
+    pub display_name: Option<String>,
 }
 
 /// Active or stopped cloned application instance tracked per Room.
@@ -107,6 +112,8 @@ pub struct ClonedAppInstance {
     pub cpu_usage_percent: f32,
     pub memory_mb: f32,
     pub launched_at_ms: u64,
+    pub cloned: bool,
+    pub clone_number: u32,
 }
 
 pub fn now_epoch_ms() -> u64 {
@@ -494,6 +501,11 @@ impl UniversalAppCloner {
             user_profile.to_string_lossy().to_string(),
         );
         env_overrides.insert("SOLANA_OS_ROOM".to_string(), clean_room.clone());
+        if let Some(rpc) = crate::shield_proxy::url_for_room(&clean_room) {
+            for key in ["SOLANA_RPC_URL", "ANCHOR_PROVIDER_URL", "SOLANA_OS_SHIELD_RPC"] {
+                env_overrides.insert(key.to_string(), rpc.clone());
+            }
+        }
         env_overrides.insert("SOLANA_OS_APP_ID".to_string(), clean_app.clone());
         env_overrides.insert(
             "SOLANA_OS_REGISTRY_ROOT".to_string(),
@@ -596,8 +608,38 @@ impl UniversalAppCloner {
         let (dirs, manifest) =
             self.prepare_isolated_room_directories(&clean_room, &clean_app, &app_subkey)?;
 
-        let launch_args =
-            build_isolated_launch_args(&clean_app, &dirs, request.extra_args.as_deref());
+        let isolate = request.isolate.unwrap_or(true);
+        let launch_args = if isolate {
+            build_isolated_launch_args(&clean_app, &dirs, request.extra_args.as_deref())
+        } else {
+            request
+                .extra_args
+                .clone()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|arg| !arg.trim().is_empty())
+                .collect()
+        };
+        let mut manifest = manifest;
+        if !isolate {
+            manifest.env_overrides.clear();
+        }
+        let app_name = request
+            .display_name
+            .clone()
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or(app_name);
+        let clone_number = if isolate {
+            self.instances
+                .values()
+                .filter(|inst| inst.cloned && inst.app_id == clean_app)
+                .map(|inst| inst.clone_number)
+                .max()
+                .unwrap_or(0)
+                + 1
+        } else {
+            0
+        };
 
         let target_desktop = if request.launch_on_enclave_desktop.unwrap_or(false) {
             SOLANA_OS_ENCLAVE_DESKTOP.to_string()
@@ -605,24 +647,25 @@ impl UniversalAppCloner {
             DEFAULT_WINDOWS_DESKTOP.to_string()
         };
 
+        let display_name = match request.instance_label {
+            Some(ref label) if !label.trim().is_empty() => {
+                format!("{} ({})", app_name, label.trim())
+            }
+            _ => app_name.clone(),
+        };
+
+        let seq = self.next_instance_seq;
+        self.next_instance_seq += 1;
         let pid = self.spawn_isolated_process(
             &exe_path,
             &launch_args,
             &dirs,
             &manifest,
             &target_desktop,
+            seq,
+            &display_name,
         )?;
-
-        let seq = self.next_instance_seq;
-        self.next_instance_seq += 1;
         let instance_id = format!("{}-{}-{}-{}", clean_room, clean_app, seq, pid);
-
-        let display_name = match request.instance_label {
-            Some(ref label) if !label.trim().is_empty() => {
-                format!("{} ({})", app_name, label.trim())
-            }
-            _ => app_name,
-        };
 
         let instance = ClonedAppInstance {
             instance_id: instance_id.clone(),
@@ -643,6 +686,8 @@ impl UniversalAppCloner {
             cpu_usage_percent: default_cpu,
             memory_mb: default_mem,
             launched_at_ms: now_epoch_ms(),
+            cloned: isolate,
+            clone_number,
         };
 
         self.instances.insert(instance_id, instance.clone());
@@ -674,11 +719,16 @@ impl UniversalAppCloner {
             .ok_or_else(|| format!("App instance '{}' not found", instance_id))?;
 
         let pid = instance.pid;
+        let tracked_id = instance.instance_id.clone();
         if instance.status != AppInstanceStatus::Stopped {
+            let still_tracked = crate::containment::release(&tracked_id);
+            // Once the job is gone the PID may already belong to an unrelated process.
             #[cfg(target_os = "windows")]
-            {
+            if still_tracked {
                 let _ = terminate_windows_process(pid);
             }
+            #[cfg(not(target_os = "windows"))]
+            let _ = still_tracked;
             #[cfg(not(target_os = "windows"))]
             {
                 if let Some(mut child) = self.child_handles.remove(&pid) {
@@ -698,7 +748,17 @@ impl UniversalAppCloner {
         Ok(instance.clone())
     }
 
+    /// Marks an instance whose process tree ended on its own as stopped.
+    pub fn mark_exited(&mut self, instance_id: &str) {
+        if let Some(instance) = self.instances.get_mut(instance_id) {
+            instance.status = AppInstanceStatus::Stopped;
+            instance.cpu_usage_percent = 0.0;
+            instance.memory_mb = 0.0;
+        }
+    }
+
     #[cfg(target_os = "windows")]
+    #[allow(clippy::too_many_arguments)]
     fn spawn_isolated_process(
         &mut self,
         exe_path: &str,
@@ -706,16 +766,19 @@ impl UniversalAppCloner {
         dirs: &IsolatedRoomDirectories,
         manifest: &RegistryOverrideManifest,
         desktop_name: &str,
+        instance_seq: u64,
+        app_name: &str,
     ) -> Result<u32, String> {
-        // Configure per-room isolated HKCU registry key in Windows Registry
+        use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::Threading::TerminateProcess;
+
         let subkey_path = format!(
             r"Software\SolanaOS\Rooms\{}\Apps\{}\HKCU_Root",
             manifest.room_id, manifest.app_id
         );
         configure_windows_registry_sandbox(&subkey_path)?;
 
-        // Launch the process via CreateProcessW onto the target desktop with isolated environment
-        let pid = crate::desktop::launch_process_on_desktop_win32(
+        let launched = crate::desktop::launch_process_on_desktop_win32(
             exe_path,
             args,
             &manifest.env_overrides,
@@ -723,13 +786,35 @@ impl UniversalAppCloner {
             desktop_name,
         )?;
 
-        // Assign process to a Windows Job Object for clean sandbox lifecycle
-        let _ = assign_pid_to_room_job_object(&manifest.room_id, pid);
+        // Job membership has to land before the primary thread runs, or Chrome-style
+        // trees spawn children that never join the job and show up on the real desktop.
+        let instance_id = format!(
+            "{}-{}-{}-{}",
+            manifest.room_id, manifest.app_id, instance_seq, launched.pid
+        );
+        crate::containment::enroll(
+            &instance_id,
+            launched.process,
+            launched.pid,
+            app_name,
+            &manifest.room_id,
+        );
 
-        Ok(pid)
+        let resume_res = crate::desktop::resume_suspended_thread(launched.thread);
+        crate::diag!("launch {instance_id} exe={exe_path} resume={resume_res:?}");
+        unsafe {
+            let _ = CloseHandle(launched.thread);
+            if resume_res.is_err() {
+                let _ = TerminateProcess(launched.process, 1);
+            }
+            let _ = CloseHandle(launched.process);
+        }
+        resume_res?;
+        Ok(launched.pid)
     }
 
     #[cfg(not(target_os = "windows"))]
+    #[allow(clippy::too_many_arguments)]
     fn spawn_isolated_process(
         &mut self,
         exe_path: &str,
@@ -737,6 +822,8 @@ impl UniversalAppCloner {
         dirs: &IsolatedRoomDirectories,
         manifest: &RegistryOverrideManifest,
         _desktop_name: &str,
+        _instance_seq: u64,
+        _app_name: &str,
     ) -> Result<u32, String> {
         // On Linux/Unix development & test hosts, if the executable exists and is runnable,
         // or if we are simulating a Windows .exe binary inside the room sandbox, we spawn a
@@ -829,29 +916,6 @@ fn configure_windows_registry_sandbox(subkey_path: &str) -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-fn assign_pid_to_room_job_object(room_id: &str, pid: u32) -> Result<(), String> {
-    use windows::core::PCWSTR;
-    use windows::Win32::Foundation::CloseHandle;
-    use windows::Win32::System::JobObjects::{AssignProcessToJobObject, CreateJobObjectW};
-    use windows::Win32::System::Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE};
-
-    unsafe {
-        let job_name = to_wide_null(&format!("Local\\SolanaOS_RoomJob_{}", room_id));
-        let job_handle =
-            CreateJobObjectW(None, PCWSTR(job_name.as_ptr())).map_err(|e| e.to_string())?;
-        let proc_handle =
-            OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, pid).map_err(|e| {
-                let _ = CloseHandle(job_handle);
-                e.to_string()
-            })?;
-        let assign_res = AssignProcessToJobObject(job_handle, proc_handle);
-        let _ = CloseHandle(proc_handle);
-        let _ = CloseHandle(job_handle);
-        assign_res.map_err(|e| format!("AssignProcessToJobObject failed: {}", e))
-    }
-}
-
-#[cfg(target_os = "windows")]
 fn terminate_windows_process(pid: u32) -> Result<(), String> {
     use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
@@ -894,6 +958,8 @@ mod tests {
                 extra_args: Some(vec!["https://jup.ag".to_string()]),
                 launch_on_enclave_desktop: Some(true),
                 instance_label: Some("Degen Burner".to_string()),
+                isolate: None,
+                display_name: None,
             })
             .expect("chrome clone in degen room should succeed");
 

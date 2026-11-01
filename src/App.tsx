@@ -6,9 +6,17 @@ import { TopMenuBar } from './components/TopMenuBar';
 import { WindowManager } from './components/WindowManager';
 import { FloatingDock } from './components/FloatingDock';
 import { Spotlight } from './components/Spotlight';
+import { Launchpad } from './components/Launchpad';
 import { NotificationStack } from './components/NotificationStack';
-import { WALLPAPER } from './components/macosMaterials';
+import { loadRpcDefaults, usePrefs, wallpaperCss } from './lib/settings';
+import { useIdleGuards } from './lib/useIdleGuards';
 import { SystemSettingsModal } from './components/SystemSettingsModal';
+import { ShieldReview } from './components/ShieldReview';
+import { invoke } from '@tauri-apps/api/core';
+import { isTauriRuntime } from './lib/tauriIpc';
+import { listen } from '@tauri-apps/api/event';
+import { expireExternal, queueExternal, type ExternalTx } from './lib/wallet';
+import { UpdatePrompt } from './components/UpdatePrompt';
 
 export const App: React.FC = () => {
   const {
@@ -17,14 +25,36 @@ export const App: React.FC = () => {
     lockVault,
     spotlightOpen,
     setSpotlightOpen,
+    launchpadOpen,
     displayBrightness,
     settingsOpen,
     setSettingsOpen,
   } = useOSStore();
+  const wallpaper = usePrefs((s) => wallpaperCss(s));
+  useIdleGuards();
 
   useEffect(() => {
     syncVaultStatus();
   }, [syncVaultStatus]);
+
+  useEffect(() => {
+    void loadRpcDefaults();
+  }, []);
+
+  const rpcUrl = usePrefs((s) => s.rpcUrl);
+  useEffect(() => {
+    if (isTauriRuntime()) void invoke('shield_proxy_set_upstream', { url: rpcUrl }).catch(() => undefined);
+  }, [rpcUrl]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    const off = listen<ExternalTx>('shield://external-tx', (e) => queueExternal(e.payload));
+    const offExpired = listen<number>('shield://external-tx-expired', (e) => expireExternal(e.payload));
+    return () => {
+      void off.then((fn) => fn());
+      void offExpired.then((fn) => fn());
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -61,13 +91,16 @@ export const App: React.FC = () => {
       className="relative flex h-full w-full select-none flex-col overflow-hidden text-white"
       style={{ filter: `brightness(${displayBrightness}%)` }}
     >
-      <img src={WALLPAPER} alt="" className="pointer-events-none absolute inset-0 size-full object-cover" />
+      <div className="pointer-events-none absolute inset-0" style={{ background: wallpaper }} />
       <TopMenuBar />
       <WindowManager />
       <NotificationStack />
       <FloatingDock />
       {settingsOpen && <SystemSettingsModal onClose={() => setSettingsOpen(false)} />}
       {spotlightOpen && <Spotlight />}
+      {launchpadOpen && <Launchpad />}
+      <ShieldReview />
+      <UpdatePrompt />
     </div>
   );
 };

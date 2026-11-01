@@ -7,8 +7,11 @@ import '@fontsource/inter/700.css';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/500.css';
 import App from './App';
+import { installErrorCapture } from './lib/errorLog';
 import './index.css';
 import './styles/glassmorphism.css';
+
+installErrorCapture();
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

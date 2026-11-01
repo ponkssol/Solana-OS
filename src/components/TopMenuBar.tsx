@@ -2,6 +2,19 @@ import React, { useState } from 'react';
 import { useOSStore, WindowId } from '../store/useOSStore';
 import { BentoControlCenter } from './BentoControlCenter';
 import { CONTROL_CENTER_ICON, WIFI_ICON } from './macosMaterials';
+import { ipcMinimizeShell } from '../lib/tauriIpc';
+import { ROOM_CONFIGS } from '../tokens/designTokens';
+import { useNow } from '../lib/useNow';
+import { DEFAULT_RPC_URL, usePrefs } from '../lib/settings';
+
+function rpcLabel(url: string): string {
+  if (url === DEFAULT_RPC_URL) return 'Solana OS mainnet';
+  try {
+    return new URL(url).hostname.replace(/^api\./, '').replace(/\.solana\.com$/, '');
+  } catch {
+    return '';
+  }
+}
 
 const MENUS: { label: string; windowId?: WindowId; heavy?: boolean }[] = [
   { label: 'Solana OS', heavy: true },
@@ -15,6 +28,8 @@ const MENUS: { label: string; windowId?: WindowId; heavy?: boolean }[] = [
 ];
 
 export const TopMenuBar: React.FC = () => {
+  const now = useNow();
+  const rpcHost = rpcLabel(usePrefs((state) => state.rpcUrl));
   const {
     lockVault,
     toggleShield,
@@ -29,6 +44,8 @@ export const TopMenuBar: React.FC = () => {
     openWindow: openApp,
     shellMode,
     toggleShellMode,
+    hosted,
+    activeRoom,
   } = useOSStore();
   const [controlOpen, setControlOpen] = useState(false);
   const [volume, setVolume] = useState(68);
@@ -62,8 +79,8 @@ export const TopMenuBar: React.FC = () => {
 
       <div className="flex items-center">
         <span className="mr-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-[590]">
-          <span className="size-1.5 rounded-full bg-[#14f195]" />
-          Helius RPC · 11ms
+          <span className={`size-1.5 rounded-full ${rpcHost ? 'bg-[#0A84FF]' : 'bg-[#8e8e93]'}`} />
+          {rpcHost ? `RPC: ${rpcHost}` : 'RPC not configured'}
         </span>
         <button type="button" aria-label="Spotlight" onClick={() => setSpotlightOpen(true)} className="px-[9px] py-[4px] text-[13px]">
           ⌕
@@ -76,12 +93,15 @@ export const TopMenuBar: React.FC = () => {
           {controlOpen && (
             <div className="absolute right-0 top-[28px]">
               <BentoControlCenter
+                identity={vault.identity}
+                roomLabel={ROOM_CONFIGS[activeRoom].label}
+                runningApps={new Set(hosted.map((win) => win.instanceId)).size}
                 shieldOn={vault.shieldActive}
                 freezeOn={processFreezeActive}
                 brightness={displayBrightness}
                 volume={volume}
                 onToggleShield={toggleShield}
-                onToggleFreeze={toggleProcessFreeze}
+                onToggleFreeze={() => void toggleProcessFreeze()}
                 onBrightness={setDisplayBrightness}
                 onVolume={setVolume}
                 onLock={() => {
@@ -93,9 +113,18 @@ export const TopMenuBar: React.FC = () => {
           )}
         </div>
         <div className="flex gap-[8px] pl-[9px] text-[13px] font-[590] leading-[16px]">
-          <span>Thu Oct 29</span>
-          <span>9:41 AM</span>
+          <span>{now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).replace(',', '')}</span>
+          <span>{now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
         </div>
+        <button
+          type="button"
+          onClick={() => void ipcMinimizeShell()}
+          aria-label="Minimize"
+          title="Minimize"
+          className="ml-[8px] flex size-[22px] items-center justify-center rounded-[6px] text-white/90 hover:bg-white/10"
+        >
+          <MinimizeIcon />
+        </button>
         <button
           type="button"
           onClick={() => void toggleShellMode()}
@@ -109,6 +138,14 @@ export const TopMenuBar: React.FC = () => {
     </header>
   );
 };
+
+function MinimizeIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden>
+      <path d="M2.6 6.5h7.8" />
+    </svg>
+  );
+}
 
 function FullscreenIcon() {
   return (

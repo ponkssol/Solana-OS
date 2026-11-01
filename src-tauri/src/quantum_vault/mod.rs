@@ -1,11 +1,11 @@
 //! `vault.solos` portable container.
 //!
-//! Daily unlock is Argon2id → XChaCha20-Poly1305. A 32-byte ML-KEM-1024
-//! shared secret, when the caller has decapsulated one, is mixed into the
-//! AEAD key. Private key bytes are `mlock`ed for the signing closure and
-//! zeroized on drop. This module does not implement lattice math itself;
-//! the KEM ciphertext slot is reserved at the ML-KEM-1024 size (1568 bytes)
-//! so a decapsulator can be dropped in without changing the container.
+//! Daily unlock is Argon2id → XChaCha20-Poly1305. A 32-byte KEM shared secret,
+//! when the caller supplies one, is mixed into the AEAD key; `hybrid` builds that
+//! secret from X25519 and ML-KEM-768. Private key bytes are `mlock`ed for the
+//! signing closure and zeroized on drop.
+
+pub mod hybrid;
 
 use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::{
@@ -166,7 +166,7 @@ fn derive_aead_key(
                 return Err("ML-KEM-1024 shared secret must be 32 bytes".into());
             }
             let mut hasher = Sha256::new();
-            hasher.update(argon_key.as_ref());
+            hasher.update(&argon_key[..]);
             hasher.update(ss);
             hasher.update(b"vault.solos/v1");
             let digest = hasher.finalize();
